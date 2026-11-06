@@ -16,6 +16,8 @@ dependencies = [
     "pandas>=3.1",
     "openpyxl>=3.1",
     "psutil>=7.2",
+    "pytz>=2025.2",
+    "tzdata>=2025.2",
 ]
 
 [project.optional-dependencies]

@@ -40,6 +40,7 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - `delta.py` — Delta helpers: `table_stats` (from add actions), `history`, `dataset(path, version)` for time travel.
   - `ingest/sources.py` — format detection, DuckDB readers (`read_csv/read_parquet/read_json`; Excel via pandas+openpyxl, ≤50 MB), column-name sanitizing — every name must work unquoted in SQL and Python: NFKC + lowercase; anything but Unicode letters, combining marks, decimal digits and `_` → `_`; repeated `_` collapsed and trimmed; empty → `column_N`; `c_` prefix if it starts with a non-letter or is a DuckDB-reserved/Python keyword; de-duplicated. `column_name_error` validates user-typed names; frontend mirror (characters only) in `lib/import.ts`. Arabic/accented names must survive, type overrides (whitelisted cast types), Delta-safe type mapping (`storage_type`: unsigned → wider signed/decimal, TIME/UUID/INTERVAL → VARCHAR…), row estimates, preview.
   - `ingest/jobs.py` — `ImportManager`: single background worker thread (imports never run concurrently). Streams `relation.to_arrow_reader()` → generator (counts rows, checks cancel) → `write_deltalake`. Cancel = event + `con.interrupt()`; failures of new tables remove the folder. Exceptions raised inside the stream abort the Delta commit (verified).
+  - `serialization.py` — `relation_to_json` goes through Arrow (`to_arrow_table`) and formats every type itself: timestamps as ISO (tz-aware → UTC with `Z`, ns precision kept), TIME/INTERVAL as text, DECIMAL as a number only when exact, ints beyond 2^53 as strings, BLOB as escaped hex text, LIST/STRUCT/MAP recursively. Never use DuckDB `fetchall()` for user data (TIMESTAMPTZ needs pytz) or pyarrow `to_pylist()` on tz-aware/ns arrays (needs zoneinfo/pandas).
   - `tables.py` — describe/sample/history/rename (directory move)/drop (move to `tmp/` then delete). `routes.py` — all `/api/*` endpoints.
 - `src/` — React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york, zinc, lucide), TanStack Query for server state.
   - `lib/backend.ts` — `BackendClient` (`get/post/put/delete`, token header, `ApiError` with FastAPI `detail`), `loadBackendInfo`, `waitForBackend`.
@@ -62,6 +63,10 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - React Router 8, TS 6, Vite 8, Vitest 5, ESLint 10, Tailwind 4, pandas 3.
 - Don't use `sed` to write `\u…` escapes (GNU sed turns `\u` into "uppercase next char"); edit such lines with a Python script using `chr(92)`. Tests contain Arabic text, so ruff's RUF001 is ignored under `tests/`.
 - Pytest: Starlette TestClient's `httpx` deprecation warning is filtered in `pyproject.toml`. Use `with TestClient(...)` so the lifespan creates services.
+
+## Packaging checklist (Phase 7)
+
+- PyInstaller must bundle `pytz` and `tzdata` (include data files, e.g. `collect_data_files("tzdata")`) — Windows has no system time-zone database. Also verify the `duckdb`, `deltalake`, `pyarrow` binaries and `openpyxl`.
 
 ## Commits
 
