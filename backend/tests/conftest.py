@@ -16,6 +16,11 @@ SALES_CSV = """order_id,Customer Name,order date,amount,region
 3,Carol,2024-02-01,7.25,north
 4,Dan,2024-02-03,13.00,east
 """
+ARABIC_CSV = """الاسم,اللقب,العمر,الراتب,المدينة,Prénom,Date de naissance,الاسم الكامل
+أحمد,بن علي,30,1500.5,تونس,Ahmed,1994-03-01,أحمد بن علي
+سارة,حداد,25,2000,صفاقس,Sarah,1999-07-15,سارة حداد
+ليلى,الطرابلسي,41,3100,تونس,Leïla,1983-11-30,ليلى الطرابلسي
+"""
 
 
 @pytest.fixture
@@ -62,7 +67,10 @@ def files(tmp_path: Path) -> dict[str, Path]:
     sheet.append(["Laptop", 1200.5, "new"])
     sheet.append(["Desk", 300, 42])
     workbook.save(xlsx)
+    arabic = src / "employees.csv"
+    arabic.write_bytes(ARABIC_CSV.encode("utf-8-sig"))
     return {
+        "arabic": arabic,
         "csv": csv,
         "tsv": tsv,
         "ndjson": ndjson,

@@ -29,7 +29,7 @@ export const DELIMITERS: { value: string; label: string }[] = [
 ];
 
 const IDENTIFIER_RE = /^[a-z_][a-z0-9_]{0,62}$/;
-const COLUMN_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+const COLUMN_RE = /^[\p{L}_][\p{L}\p{Mn}\p{Mc}\p{Nd}_]{0,127}$/u;
 
 export interface DraftColumn extends ColumnSpec {
   include: boolean;
@@ -75,7 +75,7 @@ export function columnErrors(columns: DraftColumn[]): Map<number, string> {
   columns.forEach((column, index) => {
     if (!column.include) return;
     if (!COLUMN_RE.test(column.name)) {
-      errors.set(index, "Letters, digits and underscores only");
+      errors.set(index, "Letters, digits and _ only, starting with a letter or _");
       return;
     }
     const key = column.name.toLowerCase();

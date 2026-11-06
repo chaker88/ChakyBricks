@@ -47,10 +47,160 @@ def test_detect_format_and_names() -> None:
         "c_2nd",
         "a_b",
         "a_b_2",
-        "column",
+        "column_5",
     ]
     assert sources.suggest_table_name(Path("Sales 2024.csv")) == "sales_2024"
     assert sources.suggest_table_name(Path("2024.csv")) == "t_2024"
+
+
+def test_sanitize_keeps_unicode_letters() -> None:
+    raw = [
+        "الاسم",
+        "اللقب",
+        "Prénom",
+        "Date de naissance",
+        "الاسم الكامل",
+        "\ufeffالعمر",
+        "Ça va?",
+        " (x) ",
+        "a,b;c{d}e=f\tg\nh",
+        "",
+        "___",
+        "الاسم",
+        "PRÉNOM",
+        "price?",
+        "a--b__c",
+        "€ total",
+        "x²",
+        "ﬁle",
+        "مُحَمَّد",
+        "١٢٣",
+        "order",
+        "Group",
+        "class",
+        "select",
+    ]
+    assert sources.sanitize_column_names(raw) == [
+        "الاسم",
+        "اللقب",
+        "prénom",
+        "date_de_naissance",
+        "الاسم_الكامل",
+        "العمر",
+        "ça_va",
+        "x",
+        "a_b_c_d_e_f_g_h",
+        "column_10",
+        "column_11",
+        "الاسم_2",
+        "prénom_2",
+        "price",
+        "a_b_c",
+        "total",
+        "x2",
+        "file",
+        "مُحَمَّد",
+        "c_١٢٣",
+        "c_order",
+        "c_group",
+        "c_class",
+        "c_select",
+    ]
+
+
+def test_sanitized_names_work_unquoted_in_sql_and_python() -> None:
+    raw = ["Prénom", "Date de naissance", "الاسم الكامل", "مُحَمَّد", "a-b", "price?", "2nd", "order"]
+    names = sources.sanitize_column_names(raw)
+    with duckdb.connect() as con:
+        select = ", ".join(f"{i} AS {name}" for i, name in enumerate(names))
+        rel = con.sql(f"SELECT {', '.join(names)} FROM (SELECT {select})")
+        assert rel.columns == names
+        assert rel.fetchall() == [tuple(range(len(names)))]
+    namespace: dict[str, object] = {}
+    exec("\n".join(f"{name} = {i}" for i, name in enumerate(names)), namespace)
+    assert [namespace[name] for name in names] == list(range(len(names)))
+
+
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        ("الاسم الكامل", "use letters"),
+        ("a-b", "use letters"),
+        ("2nd", "use letters"),
+        ("price?", "use letters"),
+        ("", "1 to 128"),
+        ("order", "reserved"),
+        ("Select", "reserved"),
+        ("class", "reserved"),
+    ],
+)
+def test_column_name_errors(name: str, message: str) -> None:
+    error = sources.column_name_error(name)
+    assert error is not None
+    assert message in error
+
+
+def test_column_name_accepts_unicode_identifiers() -> None:
+    for name in ["الاسم", "Prénom", "مُحَمَّد", "_x", "c_2nd", "ça_va", "none"]:
+        assert sources.column_name_error(name) is None, name
+
+
+def test_unicode_column_names_validate(files: dict[str, Path]) -> None:
+    with duckdb.connect() as con:
+        rel = sources.open_source(con, files["arabic"], SourceFormat.CSV, SourceOptions())
+        projected = sources.apply_columns(
+            rel,
+            [
+                ColumnSpec(source="الاسم", name="الاسم", type="VARCHAR"),
+                ColumnSpec(source="Prénom", name="Prénom", type="VARCHAR"),
+            ],
+        )
+        assert projected.columns == ["الاسم", "Prénom"]
+        with pytest.raises(InvalidInputError, match="use letters"):
+            sources.apply_columns(
+                rel, [ColumnSpec(source="الاسم", name="الاسم الكامل", type="VARCHAR")]
+            )
+
+
+def test_preview_arabic_csv_with_bom(files: dict[str, Path]) -> None:
+    result = run_preview(files["arabic"])
+    assert [(c["source"], c["name"], c["type"]) for c in result["source_columns"]] == [
+        ("الاسم", "الاسم", "VARCHAR"),
+        ("اللقب", "اللقب", "VARCHAR"),
+        ("العمر", "العمر", "BIGINT"),
+        ("الراتب", "الراتب", "DOUBLE"),
+        ("المدينة", "المدينة", "VARCHAR"),
+        ("Prénom", "prénom", "VARCHAR"),
+        ("Date de naissance", "date_de_naissance", "DATE"),
+        ("الاسم الكامل", "الاسم_الكامل", "VARCHAR"),
+    ]
+    assert result["sample"]["rows"][0][0] == "أحمد"
+
+
+def test_import_arabic_columns_partitioned_and_queryable(
+    services: Services, files: dict[str, Path]
+) -> None:
+    import_ok(services, request_for(files["arabic"], "employees", partition_by="المدينة"))
+    table = services.catalog.get_table("main", "employees")
+    assert [c.name for c in table.columns][:3] == ["الاسم", "اللقب", "العمر"]
+    assert table.row_count == 3
+    partitions = sorted(p.name for p in (services.workspace.warehouse / "main/employees").iterdir())
+    assert [p for p in partitions if p.startswith("المدينة=")] and len(partitions) == 3
+
+    with services.engine.cursor() as cur:
+        unquoted = cur.sql(
+            "SELECT الاسم, prénom, الاسم_الكامل FROM employees "
+            "WHERE المدينة = 'تونس' ORDER BY العمر"
+        ).fetchall()
+        quoted = cur.sql(
+            'SELECT "الاسم", sum("الراتب") FROM main."employees" '
+            "WHERE \"المدينة\" = 'تونس' GROUP BY 1 ORDER BY 1"
+        ).fetchall()
+    assert unquoted == [
+        ("أحمد", "Ahmed", "أحمد بن علي"),
+        ("ليلى", "Leïla", "ليلى الطرابلسي"),
+    ]
+    assert quoted == [("أحمد", 1500.5), ("ليلى", 3100.0)]
 
 
 @pytest.mark.parametrize("kind", ["csv", "tsv", "ndjson", "json", "parquet", "xlsx"])

@@ -1,5 +1,8 @@
+import keyword
 import re
+import unicodedata
 from enum import StrEnum
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +74,8 @@ _STORAGE_TYPE_FIXES = {
     "JSON": "VARCHAR",
     "BIT": "VARCHAR",
 }
-_COLUMN_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+_UNDERSCORES_RE = re.compile(r"_+")
+MAX_COLUMN_NAME = 128
 
 
 class SourceOptions(BaseModel):
@@ -106,14 +110,50 @@ def suggest_table_name(path: Path) -> str:
     return f"t_{name}"[:63] if name[0].isdigit() else name[:63]
 
 
+def _is_name_start(ch: str) -> bool:
+    return ch == "_" or unicodedata.category(ch).startswith("L")
+
+
+def _is_name_char(ch: str) -> bool:
+    return _is_name_start(ch) or unicodedata.category(ch) in ("Mn", "Mc", "Nd")
+
+
+@cache
+def _sql_reserved_words() -> frozenset[str]:
+    with duckdb.connect() as con:
+        rows = con.sql(
+            "SELECT keyword_name FROM duckdb_keywords() WHERE keyword_category = 'reserved'"
+        ).fetchall()
+    return frozenset(str(r[0]).lower() for r in rows)
+
+
+def is_reserved_word(name: str) -> bool:
+    return name.lower() in _sql_reserved_words() or keyword.iskeyword(name)
+
+
+def column_name_error(name: str) -> str | None:
+    if not name or len(name) > MAX_COLUMN_NAME:
+        return f"Column names must be 1 to {MAX_COLUMN_NAME} characters"
+    if not _is_name_start(name[0]) or not all(_is_name_char(ch) for ch in name):
+        return (
+            f"Invalid column name '{name}': use letters, digits and underscores, "
+            "starting with a letter or underscore"
+        )
+    if is_reserved_word(name):
+        return f"'{name}' is a reserved word in SQL or Python; try 'c_{name.lower()}'"
+    return None
+
+
 def sanitize_column_names(names: list[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
-    for raw in names:
-        name = re.sub(r"[^0-9a-z_]+", "_", raw.strip().lower()).strip("_") or "column"
-        if name[0].isdigit():
+    for index, raw in enumerate(names, start=1):
+        normalized = unicodedata.normalize("NFKC", raw).lower()
+        cleaned = "".join(ch if _is_name_char(ch) else "_" for ch in normalized)
+        name = _UNDERSCORES_RE.sub("_", cleaned).strip("_") or f"column_{index}"
+        if not _is_name_start(name[0]) or is_reserved_word(name):
             name = f"c_{name}"
-        name = name[:120]
+        name = name[: MAX_COLUMN_NAME - 8]
         candidate, n = name, 2
         while candidate in seen:
             candidate, n = f"{name}_{n}", n + 1
@@ -180,10 +220,8 @@ def apply_columns(rel: duckdb.DuckDBPyRelation, specs: list[ColumnSpec]) -> duck
     for spec in specs:
         if spec.source not in raw_types:
             raise InvalidInputError(f"Column '{spec.source}' is not in the source file")
-        if not _COLUMN_NAME_RE.match(spec.name):
-            raise InvalidInputError(
-                f"Invalid column name '{spec.name}': use letters, digits and underscores"
-            )
+        if error := column_name_error(spec.name):
+            raise InvalidInputError(error)
         if spec.name.lower() in seen:
             raise InvalidInputError(f"Duplicate column name '{spec.name}'")
         seen.add(spec.name.lower())

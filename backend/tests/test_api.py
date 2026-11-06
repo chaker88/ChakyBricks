@@ -101,6 +101,27 @@ def test_catalog_table_lifecycle(client: TestClient, files: dict[str, Path]) -> 
     assert client.delete("/api/schemas/archive").status_code == 204
 
 
+def test_arabic_table_through_api(client: TestClient, files: dict[str, Path]) -> None:
+    import_csv(client, files["arabic"], "main", "employees", partition_by="المدينة")
+
+    catalog = client.get("/api/catalog").json()["schemas"]
+    columns = catalog[0]["tables"][0]["columns"]
+    assert {"name": "الاسم", "type": "VARCHAR"} in columns
+    assert {"name": "prénom", "type": "VARCHAR"} in columns
+
+    detail = client.get("/api/tables/main/employees").json()
+    assert detail["partition_columns"] == ["المدينة"]
+    assert detail["row_count"] == 3
+
+    sample = client.get("/api/tables/main/employees/sample").json()
+    names = [c["name"] for c in sample["columns"]]
+    assert "الاسم_الكامل" in names
+    row = dict(zip(names, sample["rows"][0], strict=True))
+    assert row["المدينة"] in ("تونس", "صفاقس")
+    assert client.get("/api/tables/main/employees/sample?version=0").status_code == 200
+    assert client.get("/api/tables/main/employees/history").json()[0]["version"] == 0
+
+
 def test_import_conflict_returns_409(client: TestClient, files: dict[str, Path]) -> None:
     import_csv(client, files["csv"], "main", "sales")
     preview = client.post("/api/imports/preview", json={"path": str(files["csv"])}).json()
