@@ -6,7 +6,8 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 - Phase 1 (skeleton) — done.
 - Phase 2 (data: storage, SQLite catalog, import wizard, catalog UI) — done.
-- Next: Phase 3 (SQL editor, result grid, saved queries, history, export). The table page already navigates to `/sql?table=schema.table` and `/notebooks?table=schema.table`; Phases 3/4 should read that param.
+- Phase 3 (SQL editor, result grid, saved queries, history, export) — done.
+- Next: Phase 4 (notebooks). The table page navigates to `/notebooks?table=schema.table`; Phase 4 should read that param (the SQL page handles `/sql?table=` and `/sql?new=1`).
 
 ## Commands (run from repo root, PowerShell)
 
@@ -41,13 +42,20 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - `ingest/sources.py` — format detection, DuckDB readers (`read_csv/read_parquet/read_json`; Excel via pandas+openpyxl, ≤50 MB), column-name sanitizing — every name must work unquoted in SQL and Python: NFKC + lowercase; anything but Unicode letters, combining marks, decimal digits and `_` → `_`; repeated `_` collapsed and trimmed; empty → `column_N`; `c_` prefix if it starts with a non-letter or is a DuckDB-reserved/Python keyword; de-duplicated. `column_name_error` validates user-typed names; frontend mirror (characters only) in `lib/import.ts`. Arabic/accented names must survive, type overrides (whitelisted cast types), Delta-safe type mapping (`storage_type`: unsigned → wider signed/decimal, TIME/UUID/INTERVAL → VARCHAR…), row estimates, preview.
   - `ingest/jobs.py` — `ImportManager`: single background worker thread (imports never run concurrently). Streams `relation.to_arrow_reader()` → generator (counts rows, checks cancel) → `write_deltalake`. Cancel = event + `con.interrupt()`; failures of new tables remove the folder. Exceptions raised inside the stream abort the Delta commit (verified).
   - `serialization.py` — `relation_to_json` goes through Arrow (`to_arrow_table`) and formats every type itself: timestamps as ISO (tz-aware → UTC with `Z`, ns precision kept), TIME/INTERVAL as text, DECIMAL as a number only when exact, ints beyond 2^53 as strings, BLOB as escaped hex text, LIST/STRUCT/MAP recursively. Never use DuckDB `fetchall()` for user data (TIMESTAMPTZ needs pytz) or pyarrow `to_pylist()` on tz-aware/ns arrays (needs zoneinfo/pandas).
+  - `statements.py` — `parse_statements` (DuckDB `extract_statements`; editor is read-only: only SELECT/EXPLAIN — DESCRIBE/SUMMARIZE/FROM-first count as SELECT) and `result_query` (last statement, must be SELECT; used by export, stats, save-as-table).
+  - `sql.py` — `QueryRunner`: `run` returns the first `row_limit` rows + exact total (streams Arrow batches until limit+1; only if there are more rows does it run `rel.aggregate("count(*)")`), records history; `cancel` by query id (interrupts repeatedly until the query leaves the running set — a single interrupt sent before DuckDB starts executing is lost); `export` streams `rel.write_csv/write_parquet` on a bulk connection; `column_stats` (count, nulls, approx distinct, min/max, mean/stddev/quartiles for numerics, top 10 values). Uses relation APIs, never wraps SQL text. `python_enable_replacements=false` on every connection so Python variables can't be queried.
+  - `queries.py` — `QueryStore`: saved queries (unique, case-insensitive names) and query history (last 500) in meta.db (migration 2).
+  - Save-as-table reuses `ImportManager` with a `QueryImportRequest` (bulk connection with catalog views, sanitized column names).
+  - `sql_routes.py` — `/api/sql/{run,cancel,stats,export,save-table,history}`, `/api/saved-queries`.
   - `tables.py` — describe/sample/history/rename (directory move)/drop (move to `tmp/` then delete). `routes.py` — all `/api/*` endpoints.
 - `src/` — React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york, zinc, lucide), TanStack Query for server state.
   - `lib/backend.ts` — `BackendClient` (`get/post/put/delete`, token header, `ApiError` with FastAPI `detail`), `loadBackendInfo`, `waitForBackend`.
   - `hooks/use-api.ts` — all query/mutation hooks and `queryKeys`; invalidate `queryKeys.catalog` after catalog changes.
   - `components/import/` — `ImportProvider` (`useImport().openImport()` from anywhere; watches running jobs, toasts when the dialog is closed), `ImportWizard` (pick → configure → progress), `ConfigureStep` (destination, partition, CSV options, editable columns, live preview). Pure logic in `lib/import.ts`.
   - `routes/catalog.tsx` (layout with `components/catalog/catalog-tree.tsx`), `routes/table-page.tsx` (schema / sample / history with time-travel sample / details; rename, drop).
-  - `components/data-preview.tsx` — simple table for ≤1000 rows (Phase 3 adds the virtualized grid).
+  - `components/data-preview.tsx` — simple table for small previews; `components/result-grid.tsx` — virtualized grid (TanStack Table v9 `useTable` + `tableFeatures({columnSizingFeature, columnResizingFeature})`, TanStack Virtual rows, resizable columns, header popover).
+  - SQL page `routes/sql.tsx` (lazy-loaded: Monaco + ECharts live in that chunk). Tabs reducer + localStorage in `lib/sql-tabs.ts`; Monaco setup in `lib/monaco.ts` (local worker via `monaco-editor/editor/editor.worker?worker`, `chaky-light/dark` themes, one global SQL completion provider fed by `setCompletionTables`; one model per tab — Monaco owns the text after the model exists, React state only seeds it). Autocomplete logic in `lib/sql-completion.ts`. Per-tab runs in `hooks/use-sql.ts` (`useQueryRunner`). Results panel: status/counts, Table/Chart, export full result (native save dialog), save as table, column stats on header click.
+  - Charts: `lib/chart.ts` (validated categorical palette from the dataviz skill, light/dark; one axis; ≤8 series, ≤3 for scatter; pie folds >8 slices into Other) + `components/sql/result-chart.tsx` (tree-shaken `echarts/core`).
   - Theme, nav rail, command palette (Ctrl+K: navigation, import, tables), Ctrl+1..7 shortcuts as in Phase 1.
 
 ## Conventions
@@ -61,6 +69,7 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - **DuckDB 2.0**: a connection with an unfinished `execute()` result blocks further work (fetch everything or use `con.sql(...)` relations). Arrow streaming is `relation.to_arrow_reader(batch_size)` (no `fetch_record_batch` on the connection). `duckdb_views()` column is `view_name`.
   - **deltalake 1.6**: `schema().to_arrow()` / `get_add_actions()` return arro3 objects — wrap with `pa.schema(...)` / `pa.table(...)`. Writing timestamps without tz auto-enables `timestampNtz`.
   - React Router 8, TS 6, Vite 8, Vitest 5, ESLint 10, Tailwind 4, pandas 3.
+  - TanStack Table **v9** (`useTable`, features registered via `tableFeatures`, `helper.columns([...])`; docs in `node_modules/@tanstack/react-table/skills/`), react-resizable-panels **v4** (`orientation`, sizes as `"45%"` strings — numbers are pixels), ECharts 6, Monaco 0.57 (`monaco-editor/*` maps to `esm/vs/*`).
 - Don't use `sed` to write `\u…` escapes (GNU sed turns `\u` into "uppercase next char"); edit such lines with a Python script using `chr(92)`. Tests contain Arabic text, so ruff's RUF001 is ignored under `tests/`.
 - Pytest: Starlette TestClient's `httpx` deprecation warning is filtered in `pyproject.toml`. Use `with TestClient(...)` so the lifespan creates services.
 

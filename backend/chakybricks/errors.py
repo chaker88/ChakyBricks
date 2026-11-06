@@ -12,3 +12,14 @@ class ConflictError(ChakyError):
 
 class InvalidInputError(ChakyError):
     status_code = 422
+
+
+class QueryError(ChakyError):
+    status_code = 400
+
+
+class QueryCancelledError(ChakyError):
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("Query cancelled")

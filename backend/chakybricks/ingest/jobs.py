@@ -25,9 +25,11 @@ from chakybricks.ingest.sources import (
     SourceOptions,
     apply_columns,
     estimate_rows,
+    inferred_columns,
     open_source,
     resolve_source,
 )
+from chakybricks.statements import result_query
 from chakybricks.workspace import Workspace
 
 log = logging.getLogger(__name__)
@@ -61,15 +63,24 @@ class ImportRequest(BaseModel):
     mode: ImportMode = ImportMode.CREATE
 
 
+class QueryImportRequest(BaseModel):
+    sql: str
+    schema_name: str
+    table: str
+    partition_by: str | None = None
+    mode: ImportMode = ImportMode.CREATE
+
+
 class ImportCancelled(Exception):
     pass
 
 
 @dataclass
 class ImportJob:
-    request: ImportRequest
+    request: ImportRequest | QueryImportRequest
     schema: str
     table: str
+    source: str
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     state: ImportState = ImportState.QUEUED
     rows_written: int = 0
@@ -100,7 +111,7 @@ class ImportJob:
             "state": self.state.value,
             "schema": self.schema,
             "table": self.table,
-            "source": self.request.path,
+            "source": self.source,
             "rows_written": self.rows_written,
             "estimated_rows": self.estimated_rows,
             "progress": self.progress,
@@ -121,28 +132,31 @@ class ImportManager:
         self._worker = threading.Thread(target=self._work, name="imports", daemon=True)
         self._worker.start()
 
-    def submit(self, request: ImportRequest) -> ImportJob:
+    def submit(self, request: ImportRequest | QueryImportRequest) -> ImportJob:
         schema = normalize_schema(request.schema_name)
         table = normalize_identifier(request.table, "table name")
-        path = resolve_source(request.path)
-        names = [c.name for c in request.columns]
-        if request.partition_by and request.partition_by not in names:
-            raise InvalidInputError(f"Partition column '{request.partition_by}' is not imported")
+        if isinstance(request, ImportRequest):
+            path = resolve_source(request.path)
+            request = request.model_copy(update={"path": str(path)})
+            source = str(path)
+        else:
+            request = request.model_copy(update={"sql": result_query(request.sql)})
+            source = "SQL query"
         if request.mode == ImportMode.CREATE and self.catalog.find_table(schema, table):
             raise ConflictError(
                 f"Table '{schema}.{table}' already exists; choose overwrite or append"
             )
-        with self.engine.bulk_connection() as con:
-            rel = apply_columns(
-                open_source(con, path, request.format, request.options), request.columns
-            )
+        with self._connection(request) as con:
+            rel, _ = self._relation(con, request)
+            if request.partition_by and request.partition_by not in rel.columns:
+                raise InvalidInputError(
+                    f"Partition column '{request.partition_by}' is not imported"
+                )
             try:
-                rel.limit(0).fetchall()
+                rel.limit(0).to_arrow_table()
             except duckdb.Error as exc:
                 raise InvalidInputError(str(exc)) from exc
-        job = ImportJob(
-            request=request.model_copy(update={"path": str(path)}), schema=schema, table=table
-        )
+        job = ImportJob(request=request, schema=schema, table=table, source=source)
         self._jobs[job.id] = job
         self._prune()
         self._queue.put(job)
@@ -207,13 +221,11 @@ class ImportManager:
         if existing is None and table_path.exists():
             shutil.rmtree(table_path)
 
-        con = self.engine.bulk_connection()
+        con = self._connection(request)
         job.connection = con
         try:
-            source = resolve_source(request.path)
-            raw = open_source(con, source, request.format, request.options)
-            job.estimated_rows = estimate_rows(source, request.format, raw)
-            reader = apply_columns(raw, request.columns).to_arrow_reader(BATCH_ROWS)
+            rel, job.estimated_rows = self._relation(con, request)
+            reader = rel.to_arrow_reader(BATCH_ROWS)
 
             def batches() -> Iterator[pa.RecordBatch]:
                 for batch in reader:
@@ -244,8 +256,24 @@ class ImportManager:
             con.close()
 
         stats = delta.table_stats(table_path)
-        self.catalog.upsert_table(job.schema, job.table, location, stats, source=request.path)
+        self.catalog.upsert_table(job.schema, job.table, location, stats, source=job.source)
         self._finish(job, ImportState.SUCCEEDED)
+
+    def _connection(self, request: ImportRequest | QueryImportRequest) -> duckdb.DuckDBPyConnection:
+        return self.engine.bulk_connection(with_catalog=isinstance(request, QueryImportRequest))
+
+    def _relation(
+        self, con: duckdb.DuckDBPyConnection, request: ImportRequest | QueryImportRequest
+    ) -> tuple[duckdb.DuckDBPyRelation, int | None]:
+        if isinstance(request, QueryImportRequest):
+            try:
+                rel = con.sql(request.sql)
+            except duckdb.Error as exc:
+                raise InvalidInputError(str(exc)) from exc
+            return apply_columns(rel, inferred_columns(rel)), None
+        source = resolve_source(request.path)
+        raw = open_source(con, source, request.format, request.options)
+        return apply_columns(raw, request.columns), estimate_rows(source, request.format, raw)
 
     def _finish(self, job: ImportJob, state: ImportState, error: str | None = None) -> None:
         job.state = state

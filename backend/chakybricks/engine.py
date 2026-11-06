@@ -29,6 +29,7 @@ def configure_connection(
 ) -> None:
     con.execute(f"SET memory_limit = '{settings.effective_memory_limit_mb}MB'")
     con.execute(f"SET temp_directory = {quote_literal(tmp_dir.as_posix())}")
+    con.execute("SET python_enable_replacements = false")
     if bulk:
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET TimeZone = 'UTC'")
@@ -84,9 +85,19 @@ class Engine:
         finally:
             cur.close()
 
-    def bulk_connection(self) -> duckdb.DuckDBPyConnection:
+    def bulk_connection(self, *, with_catalog: bool = False) -> duckdb.DuckDBPyConnection:
         con = duckdb.connect()
         configure_connection(con, self.settings, self.workspace.tmp, bulk=True)
+        if with_catalog:
+            self.sync()
+            with self._lock:
+                registrations = dict(self._registrations)
+            for schema in self.catalog.list_schemas():
+                con.execute(f"CREATE SCHEMA IF NOT EXISTS {quote_ident(schema)}")
+            for (schema, table), registration in registrations.items():
+                con.register(registration.name, registration.dataset)
+                view = f"{quote_ident(schema)}.{quote_ident(table)}"
+                con.execute(f"CREATE VIEW {view} AS SELECT * FROM {quote_ident(registration.name)}")
         return con
 
     def close(self) -> None:

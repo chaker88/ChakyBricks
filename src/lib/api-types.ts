@@ -97,4 +97,55 @@ export interface AppSettings {
   effective_memory_limit_mb: number;
   default_memory_limit_mb: number;
   total_memory_mb: number;
+  row_limit: number;
+}
+
+export interface QueryResult extends RowSet {
+  query_id: string;
+  row_count: number;
+  truncated: boolean;
+  elapsed_ms: number;
+  statement_count: number;
+}
+
+export interface ColumnStats {
+  column: string;
+  type: string;
+  rows: number;
+  nulls: number;
+  distinct: number;
+  numeric: boolean;
+  min?: CellValue;
+  max?: CellValue;
+  mean?: number | null;
+  stddev?: number | null;
+  p25?: number | null;
+  median?: number | null;
+  p75?: number | null;
+  top_values: { value: CellValue; count: number }[];
+}
+
+export interface SavedQuery {
+  id: number;
+  name: string;
+  sql: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QueryHistoryEntry {
+  id: number;
+  sql: string;
+  started_at: string;
+  duration_ms: number;
+  status: "succeeded" | "failed" | "cancelled";
+  row_count: number | null;
+  error: string | null;
+}
+
+export interface ExportResult {
+  path: string;
+  size_bytes: number;
+  elapsed_ms: number;
 }

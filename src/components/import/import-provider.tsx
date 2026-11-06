@@ -17,17 +17,13 @@ export function ImportProvider({ children }: { children: ReactNode }) {
     setSession((s) => s + 1);
     setOpen(true);
   }, []);
-  const value = useMemo(() => ({ openImport }), [openImport]);
+  const trackJob = useCallback((id: string) => setJobs((current) => [...current, id]), []);
+  const value = useMemo(() => ({ openImport, trackJob }), [openImport, trackJob]);
 
   return (
     <ImportContext.Provider value={value}>
       {children}
-      <ImportWizard
-        key={session}
-        open={open}
-        onOpenChange={setOpen}
-        onJobStarted={(id) => setJobs((current) => [...current, id])}
-      />
+      <ImportWizard key={session} open={open} onOpenChange={setOpen} onJobStarted={trackJob} />
       {jobs.map((id) => (
         <JobWatcher
           key={id}

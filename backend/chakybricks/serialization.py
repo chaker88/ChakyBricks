@@ -16,8 +16,14 @@ _UNIT_DIGITS = {"s": 0, "ms": 3, "us": 6, "ns": 9}
 
 def relation_to_json(rel: duckdb.DuckDBPyRelation) -> dict[str, Any]:
     """Serializes via Arrow so no Python type conversion (pytz, zoneinfo) is needed."""
-    columns = [{"name": n, "type": str(t)} for n, t in zip(rel.columns, rel.types, strict=True)]
-    table = rel.to_arrow_table()
+    return table_to_json(rel.to_arrow_table(), relation_columns(rel))
+
+
+def relation_columns(rel: duckdb.DuckDBPyRelation) -> list[dict[str, str]]:
+    return [{"name": n, "type": str(t)} for n, t in zip(rel.columns, rel.types, strict=True)]
+
+
+def table_to_json(table: pa.Table, columns: list[dict[str, str]]) -> dict[str, Any]:
     values = [column_values(table.column(i)) for i in range(table.num_columns)]
     rows = [list(row) for row in zip(*values, strict=True)] if values else []
     return {"columns": columns, "rows": rows}

@@ -1,4 +1,4 @@
-import { Moon, Sun, Table2, Upload } from "lucide-react";
+import { Code2, Moon, Sun, Table2, Upload } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   CommandDialog,
@@ -50,6 +50,10 @@ export function CommandPalette({
           <CommandItem onSelect={() => run(openImport)}>
             <Upload />
             Import data
+          </CommandItem>
+          <CommandItem onSelect={() => run(() => navigate("/sql?new=1"))}>
+            <Code2 />
+            New query
           </CommandItem>
         </CommandGroup>
         {tables.length > 0 && (

@@ -1,17 +1,20 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { HashRouter, Route, Routes } from "react-router";
 import { AppShell } from "@/components/app-shell";
 import { BackendProvider } from "@/components/backend-provider";
 import { ImportProvider } from "@/components/import/import-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CatalogHome, CatalogLayout } from "@/routes/catalog";
 import { HomePage } from "@/routes/home";
-import { DashboardsPage, JobsPage, NotebooksPage, SqlPage } from "@/routes/sections";
+import { DashboardsPage, JobsPage, NotebooksPage } from "@/routes/sections";
 import { SettingsPage } from "@/routes/settings";
 import { TablePage } from "@/routes/table-page";
+
+const SqlPage = lazy(() => import("@/routes/sql"));
 
 function createQueryClient() {
   return new QueryClient({
@@ -38,7 +41,14 @@ export function App() {
                       <Route index element={<CatalogHome />} />
                       <Route path=":schema/:table" element={<TablePage />} />
                     </Route>
-                    <Route path="sql" element={<SqlPage />} />
+                    <Route
+                      path="sql"
+                      element={
+                        <Suspense fallback={<PageSkeleton />}>
+                          <SqlPage />
+                        </Suspense>
+                      }
+                    />
                     <Route path="notebooks" element={<NotebooksPage />} />
                     <Route path="dashboards" element={<DashboardsPage />} />
                     <Route path="jobs" element={<JobsPage />} />
@@ -52,5 +62,14 @@ export function App() {
         </QueryClientProvider>
       </BackendProvider>
     </ThemeProvider>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-3 p-6">
+      <Skeleton className="h-8 w-1/3" />
+      <Skeleton className="h-64 w-full" />
+    </div>
   );
 }

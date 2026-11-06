@@ -184,8 +184,11 @@ export function useUpdateSettings() {
   const client = useClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (changes: { workspace?: string; memory_limit_mb?: number | null }) =>
-      requireClient(client).put<AppSettings>("/api/settings", changes),
+    mutationFn: (changes: {
+      workspace?: string;
+      memory_limit_mb?: number | null;
+      row_limit?: number;
+    }) => requireClient(client).put<AppSettings>("/api/settings", changes),
     onSuccess: (settings, changes) => {
       queryClient.setQueryData(queryKeys.settings, settings);
       if (changes.workspace) return queryClient.invalidateQueries();

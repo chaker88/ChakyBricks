@@ -57,8 +57,11 @@ export function SettingsPage() {
         >
           <MemoryLimitSetting />
         </SettingRow>
-        <SettingRow label="Default row limit" description="Rows returned to the result grid.">
-          <span className="text-xs text-muted-foreground">10,000</span>
+        <SettingRow
+          label="Default row limit"
+          description="Rows loaded into the result grid. The total row count is always shown, and exports include every row."
+        >
+          <RowLimitSetting />
         </SettingRow>
         <SettingRow label="Engine" description="Local backend process status.">
           <span className="text-xs text-muted-foreground">
@@ -103,6 +106,50 @@ function WorkspaceSetting() {
         <FolderOpen />
         Change…
       </Button>
+    </div>
+  );
+}
+
+function RowLimitSetting() {
+  const settings = useSettings();
+  const update = useUpdateSettings();
+  const [draft, setDraft] = useState<string | null>(null);
+
+  if (!settings.data) return <Skeleton className="h-8 w-36" />;
+  const current = String(settings.data.row_limit);
+  const value = draft ?? current;
+  const parsed = Number(value);
+  const valid = Number.isInteger(parsed) && parsed >= 100 && parsed <= 1_000_000;
+
+  const save = () => {
+    if (!valid || value === current) return setDraft(null);
+    update.mutate(
+      { row_limit: parsed },
+      {
+        onSuccess: () => {
+          setDraft(null);
+          toast.success("Row limit updated");
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="number"
+        step="1000"
+        min="100"
+        max="1000000"
+        value={value}
+        aria-invalid={!valid}
+        className="h-8 w-32 text-xs"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+      />
+      <span className="text-xs text-muted-foreground">rows (100 – 1,000,000)</span>
     </div>
   );
 }

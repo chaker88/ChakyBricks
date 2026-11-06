@@ -1,17 +1,5 @@
-import { CalendarClock, Code2, LayoutDashboard, NotebookPen } from "lucide-react";
+import { CalendarClock, LayoutDashboard, NotebookPen } from "lucide-react";
 import { EmptyState, Page } from "@/components/page";
-
-export function SqlPage() {
-  return (
-    <Page title="SQL editor" description="Query any table in the catalog with DuckDB SQL.">
-      <EmptyState
-        icon={Code2}
-        title="No queries yet"
-        description="Write SQL against your tables, chart the results and save queries for dashboards."
-      />
-    </Page>
-  );
-}
 
 export function NotebooksPage() {
   return (

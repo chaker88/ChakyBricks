@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
 from chakybricks import tables
-from chakybricks.config import MIN_MEMORY_LIMIT_MB, default_memory_limit_mb, total_memory_mb
+from chakybricks.config import (
+    MAX_ROW_LIMIT,
+    MIN_MEMORY_LIMIT_MB,
+    MIN_ROW_LIMIT,
+    default_memory_limit_mb,
+    total_memory_mb,
+)
 from chakybricks.ingest.jobs import ImportRequest
 from chakybricks.ingest.sources import (
     ColumnSpec,
@@ -32,6 +38,7 @@ ServicesDep = Annotated[Services, Depends(get_services)]
 class SettingsUpdate(BaseModel):
     workspace: str | None = None
     memory_limit_mb: int | None = Field(default=None, ge=MIN_MEMORY_LIMIT_MB)
+    row_limit: int | None = Field(default=None, ge=MIN_ROW_LIMIT, le=MAX_ROW_LIMIT)
 
 
 class SchemaCreate(BaseModel):
@@ -58,6 +65,7 @@ def _settings_payload(services: Services) -> dict[str, Any]:
         "effective_memory_limit_mb": settings.effective_memory_limit_mb,
         "default_memory_limit_mb": default_memory_limit_mb(),
         "total_memory_mb": total_memory_mb(),
+        "row_limit": settings.row_limit,
     }
 
 
@@ -73,6 +81,8 @@ def update_settings(body: SettingsUpdate, services: ServicesDep) -> dict[str, An
         changes["workspace"] = Path(body.workspace)
     if "memory_limit_mb" in body.model_fields_set:
         changes["memory_limit_mb"] = body.memory_limit_mb
+    if body.row_limit is not None:
+        changes["row_limit"] = body.row_limit
     services.update_settings(changes)
     return _settings_payload(services)
 

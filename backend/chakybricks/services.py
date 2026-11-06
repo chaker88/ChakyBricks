@@ -6,6 +6,8 @@ from chakybricks.config import Settings, SettingsStore
 from chakybricks.engine import Engine
 from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.ingest.jobs import ImportManager
+from chakybricks.queries import QueryStore
+from chakybricks.sql import QueryRunner
 from chakybricks.workspace import Workspace
 
 
@@ -21,6 +23,8 @@ class Services:
         self.catalog = Catalog(self.workspace.meta_db)
         self.engine = Engine(self.catalog, self.workspace, self.settings)
         self.imports = ImportManager(self.workspace, self.catalog, self.engine)
+        self.queries = QueryStore(self.catalog)
+        self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings)
 
     def update_settings(self, changes: dict[str, object]) -> Settings:
         with self._lock:

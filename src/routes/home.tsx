@@ -7,7 +7,7 @@ import {
   Upload,
   type LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { EmptyState, Page } from "@/components/page";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +20,7 @@ export function HomePage() {
   const backend = useBackend();
   const catalog = useCatalog();
   const { openImport } = useImport();
+  const navigate = useNavigate();
   const comingSoon = (label: string) => () => toast(`${label} is coming soon`);
 
   const actions: { label: string; description: string; icon: LucideIcon; onClick: () => void }[] = [
@@ -39,7 +40,7 @@ export function HomePage() {
       label: "New query",
       description: "Explore tables with SQL",
       icon: Code2,
-      onClick: comingSoon("The SQL editor"),
+      onClick: () => navigate("/sql?new=1"),
     },
     {
       label: "New dashboard",

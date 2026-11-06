@@ -33,6 +33,25 @@ MIGRATIONS = [
         PRIMARY KEY (schema_name, name)
     );
     """,
+    """
+    CREATE TABLE saved_queries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        sql TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    CREATE TABLE query_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sql TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        row_count INTEGER,
+        error TEXT
+    );
+    """,
 ]
 
 
@@ -105,7 +124,7 @@ class Catalog:
         self.ensure_schema(DEFAULT_SCHEMA)
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
+    def connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.path, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -116,7 +135,7 @@ class Catalog:
             conn.close()
 
     def _migrate(self) -> None:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute("PRAGMA journal_mode = WAL")
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             for index, script in enumerate(MIGRATIONS[version:], start=version + 1):
@@ -124,12 +143,12 @@ class Catalog:
                 conn.execute(f"PRAGMA user_version = {index}")
 
     def list_schemas(self) -> list[str]:
-        with self._connect() as conn:
+        with self.connect() as conn:
             return [r["name"] for r in conn.execute("SELECT name FROM schemas ORDER BY name")]
 
     def ensure_schema(self, name: str) -> str:
         name = normalize_schema(name)
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO schemas (name, created_at) VALUES (?, ?)", (name, now_iso())
             )
@@ -148,7 +167,7 @@ class Catalog:
             raise NotFoundError(f"Schema '{name}' does not exist")
         if self.list_tables(name):
             raise ConflictError(f"Schema '{name}' is not empty")
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute("DELETE FROM schemas WHERE name = ?", (name,))
 
     def list_tables(self, schema: str | None = None) -> list[TableInfo]:
@@ -157,12 +176,12 @@ class Catalog:
         if schema is not None:
             query += " WHERE schema_name = ?"
             params = (schema,)
-        with self._connect() as conn:
+        with self.connect() as conn:
             rows = conn.execute(query + " ORDER BY schema_name, name", params).fetchall()
         return [_row_to_table(r) for r in rows]
 
     def find_table(self, schema: str, name: str) -> TableInfo | None:
-        with self._connect() as conn:
+        with self.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM tables WHERE schema_name = ? AND name = ?", (schema, name)
             ).fetchone()
@@ -180,7 +199,7 @@ class Catalog:
         self.ensure_schema(schema)
         timestamp = now_iso()
         columns = json.dumps([{"name": c.name, "type": c.type} for c in stats.columns])
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO tables (schema_name, name, location, source, created_at, updated_at,
@@ -213,7 +232,7 @@ class Catalog:
     def rename_table(
         self, schema: str, name: str, new_schema: str, new_name: str, new_location: str
     ) -> TableInfo:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 """
                 UPDATE tables SET schema_name = ?, name = ?, location = ?, updated_at = ?
@@ -224,7 +243,7 @@ class Catalog:
         return self.get_table(new_schema, new_name)
 
     def delete_table(self, schema: str, name: str) -> None:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute("DELETE FROM tables WHERE schema_name = ? AND name = ?", (schema, name))
 
 

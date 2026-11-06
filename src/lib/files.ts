@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { DATA_FILE_EXTENSIONS } from "@/lib/import";
 
 export async function pickDataFile(): Promise<string | null> {
@@ -17,4 +17,17 @@ export async function pickDirectory(title: string): Promise<string | null> {
   if (!isTauri()) return window.prompt(title)?.trim() || null;
   const result = await open({ multiple: false, directory: true, title });
   return typeof result === "string" ? result : null;
+}
+
+export async function pickSavePath(
+  defaultName: string,
+  format: "csv" | "parquet",
+): Promise<string | null> {
+  if (!isTauri()) return window.prompt("Save to path", defaultName)?.trim() || null;
+  const result = await save({
+    title: "Export full result",
+    defaultPath: defaultName,
+    filters: [{ name: format === "csv" ? "CSV" : "Parquet", extensions: [format] }],
+  });
+  return result ?? null;
 }
