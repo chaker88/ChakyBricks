@@ -2,12 +2,43 @@
 
 Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of truth**; follow it exactly and ask before deviating. Work is delivered phase by phase (see SPEC.md "Delivery phases"); at the end of each phase run all checks, confirm the app launches, commit, and stop for review.
 
-## Status
+## Current status
 
-- Phase 1 (skeleton) — done.
-- Phase 2 (data: storage, SQLite catalog, import wizard, catalog UI) — done.
-- Phase 3 (SQL editor, result grid, saved queries, history, export) — done.
-- Next: Phase 4 (notebooks). The table page navigates to `/notebooks?table=schema.table`; Phase 4 should read that param (the SQL page handles `/sql?table=` and `/sql?new=1`).
+### Phases completed
+
+- Phase 1 (skeleton) — done, reviewed.
+- Phase 2 (data: storage, SQLite catalog, import wizard, catalog UI) — done, reviewed and hand-tested (incl. an 800 MB CSV, Arabic column names, TIMESTAMPTZ). Follow-up fixes: Unicode column names, Arrow-based serialization, pytz/tzdata.
+- Phase 3 (SQL editor, result grid, saved queries, history, export) — implemented and committed; **awaiting the user's hand test and review**. Automated checks pass; the editor UI has not been clicked through by Claude.
+
+### Phase 3 — still to test by hand
+
+- Editor: multiple tabs (new/close/middle-click close, persist across restart), Monaco loads offline, light/dark theme follows the app.
+- Autocomplete: tables, `schema.` → tables, `alias.` / `table.` → columns (incl. Arabic names), keywords, functions.
+- Shortcuts: Ctrl+Enter (selection or all), Ctrl+Shift+Enter (run all), Ctrl+S (save / update saved query), dirty dot on modified saved tabs.
+- Results: row-limit truncation message with exact total, grid scrolling with 100k+ rows (set row limit to 100,000+), column resize / double-click reset, column stats popover (numeric, text, date).
+- Cancel a long query (e.g. `SELECT count(*) FROM range(100000000000) t(i) WHERE i % 7 = 1`).
+- Quick chart: bar/line/area/scatter/donut, series toggles, dark mode colors.
+- Export full result to CSV and Parquet via the native save dialog (large result).
+- Save as table (new, replace, append) → toast, appears in catalog, queryable.
+- Sidebar: schema browser insert + ▶ preview, saved queries open/rename/delete, history reopen/clear.
+- Entry points: table page "Open in SQL", Home "New query", Ctrl+K "New query"; Settings row limit.
+- Errors: syntax error, unknown table, rejected write statement message.
+
+### Pending change (approved direction for decision 1, not implemented yet)
+
+Phase 3 currently makes the SQL editor read-only (SELECT/EXPLAIN only). Change it to also support these statements, routed through the same Delta + catalog path as "Save as table" (`ImportManager` with a query source, sanitized column names, catalog upsert), never through DuckDB's in-memory tables:
+
+- `CREATE TABLE [schema.]t AS SELECT …` → create (error if it exists)
+- `CREATE OR REPLACE TABLE [schema.]t AS SELECT …` → overwrite
+- `INSERT INTO [schema.]t SELECT …` → append
+- `DROP TABLE [IF EXISTS] [schema.]t` → `tables.drop`
+- `ALTER TABLE [schema.]t RENAME TO new_name` → `tables.rename`
+
+Keep rejecting `SET`, `COPY`, `ATTACH`, `UPDATE`, `DELETE` (and other writes) with a clear message. Results should report affected table / rows; refresh the catalog in the UI afterwards; record in history. Add tests for each statement and for the rejected ones.
+
+### Next
+
+After the user approves Phase 3 and the pending change is done: Phase 4 (notebooks). The table page navigates to `/notebooks?table=schema.table`; Phase 4 should read that param (the SQL page handles `/sql?table=` and `/sql?new=1`).
 
 ## Commands (run from repo root, PowerShell)
 
