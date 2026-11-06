@@ -1,0 +1,17 @@
+[package]
+name = "chakybricks"
+version = "0.1.0"
+description = "ChakyBricks desktop lakehouse"
+edition = "2021"
+
+[lib]
+name = "chakybricks_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+getrandom = "0.3"

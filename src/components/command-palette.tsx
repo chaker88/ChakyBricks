@@ -1,0 +1,53 @@
+import { Moon, Sun } from "lucide-react";
+import { useNavigate } from "react-router";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command";
+import { NAV_ITEMS } from "@/lib/nav";
+import { useTheme } from "@/lib/theme";
+
+export function CommandPalette({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
+
+  const run = (action: () => void) => {
+    onOpenChange(false);
+    action();
+  };
+
+  return (
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <CommandInput placeholder="Type a command or search…" />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Go to">
+          {NAV_ITEMS.map((item) => (
+            <CommandItem key={item.path} onSelect={() => run(() => navigate(item.path))}>
+              <item.icon />
+              {item.label}
+              <CommandShortcut>Ctrl {item.shortcut}</CommandShortcut>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Preferences">
+          <CommandItem onSelect={() => run(toggle)}>
+            {theme === "dark" ? <Sun /> : <Moon />}
+            Switch to {theme === "dark" ? "light" : "dark"} theme
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  );
+}
