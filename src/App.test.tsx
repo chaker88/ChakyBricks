@@ -15,7 +15,7 @@ describe("App shell", () => {
     render(<App />);
     expect(screen.getByText("Welcome to ChakyBricks")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "2", ctrlKey: true });
-    expect(await screen.findByRole("heading", { name: "Catalog" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Catalog" })).toBeInTheDocument();
   });
 
   it("shows the engine as offline outside the desktop app", async () => {

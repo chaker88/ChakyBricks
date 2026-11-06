@@ -1,0 +1,100 @@
+export interface ColumnInfo {
+  name: string;
+  type: string;
+}
+
+export interface TableSummary {
+  schema: string;
+  name: string;
+  version: number;
+  row_count: number;
+  size_bytes: number;
+  updated_at: string;
+  columns: ColumnInfo[];
+}
+
+export interface TableDetail extends TableSummary {
+  location: string;
+  source: string | null;
+  created_at: string;
+  partition_columns: string[];
+}
+
+export interface CatalogResponse {
+  schemas: { name: string; tables: TableSummary[] }[];
+}
+
+export type CellValue =
+  string | number | boolean | null | CellValue[] | { [key: string]: CellValue };
+
+export interface RowSet {
+  columns: ColumnInfo[];
+  rows: CellValue[][];
+}
+
+export interface HistoryEntry {
+  version: number;
+  timestamp: number | null;
+  operation: string | null;
+  parameters: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+}
+
+export type SourceFormat = "csv" | "tsv" | "parquet" | "json" | "excel";
+export type ImportMode = "create" | "overwrite" | "append";
+export type ImportState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface SourceOptions {
+  delimiter: string | null;
+  header: boolean;
+  sheet: string | null;
+}
+
+export interface ColumnSpec {
+  source: string;
+  name: string;
+  type: string;
+}
+
+export interface PreviewResponse {
+  path: string;
+  format: SourceFormat;
+  file_size: number;
+  suggested_table: string;
+  estimated_rows: number | null;
+  source_columns: ColumnSpec[];
+  editable_types: string[];
+  sample: RowSet;
+}
+
+export interface ImportRequest {
+  path: string;
+  format: SourceFormat;
+  options: SourceOptions;
+  columns: ColumnSpec[];
+  schema_name: string;
+  table: string;
+  partition_by: string | null;
+  mode: ImportMode;
+}
+
+export interface ImportJob {
+  id: string;
+  state: ImportState;
+  schema: string;
+  table: string;
+  source: string;
+  rows_written: number;
+  estimated_rows: number | null;
+  progress: number | null;
+  error: string | null;
+  elapsed_seconds: number;
+}
+
+export interface AppSettings {
+  workspace: string;
+  memory_limit_mb: number | null;
+  effective_memory_limit_mb: number;
+  default_memory_limit_mb: number;
+  total_memory_mb: number;
+}

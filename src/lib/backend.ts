@@ -13,6 +13,38 @@ export interface HealthResponse {
 
 export const TOKEN_HEADER = "X-ChakyBricks-Token";
 
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+
+  static async from(response: Response): Promise<ApiError> {
+    const text = await response.text().catch(() => "");
+    return new ApiError(response.status, parseErrorDetail(text) || response.statusText);
+  }
+}
+
+export function parseErrorDetail(text: string): string {
+  try {
+    const body = JSON.parse(text) as { detail?: unknown };
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail)) {
+      return body.detail
+        .map((d: { msg?: string; loc?: unknown[] }) =>
+          [d.loc?.slice(1).join("."), d.msg].filter(Boolean).join(": "),
+        )
+        .join("; ");
+    }
+  } catch {
+    // not JSON
+  }
+  return text;
+}
+
 export class BackendClient {
   readonly baseUrl: string;
 
@@ -36,11 +68,25 @@ export class BackendClient {
     headers.set(TOKEN_HEADER, this.info.token);
     if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     const response = await fetch(this.url(path), { ...init, headers });
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      throw new Error(`${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
-    }
+    if (!response.ok) throw await ApiError.from(response);
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
+  }
+
+  get<T>(path: string): Promise<T> {
+    return this.request<T>(path);
+  }
+
+  post<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) });
+  }
+
+  put<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  delete(path: string): Promise<void> {
+    return this.request<void>(path, { method: "DELETE" });
   }
 
   health(): Promise<HealthResponse> {

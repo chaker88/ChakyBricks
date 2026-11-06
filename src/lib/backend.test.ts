@@ -1,4 +1,4 @@
-import { BackendClient, TOKEN_HEADER, waitForBackend } from "@/lib/backend";
+import { BackendClient, TOKEN_HEADER, parseErrorDetail, waitForBackend } from "@/lib/backend";
 
 const info = { port: 51234, token: "secret" };
 
@@ -26,7 +26,7 @@ describe("BackendClient", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("nope", { status: 401, statusText: "Unauthorized" }),
     );
-    await expect(new BackendClient(info).health()).rejects.toThrow("401 Unauthorized: nope");
+    await expect(new BackendClient(info).health()).rejects.toThrow("nope");
   });
 
   it("retries until the backend is healthy", async () => {
@@ -44,5 +44,20 @@ describe("BackendClient", () => {
     await expect(
       waitForBackend(new BackendClient(info), { attempts: 2, intervalMs: 1 }),
     ).rejects.toThrow("connection refused");
+  });
+});
+
+describe("parseErrorDetail", () => {
+  it("extracts FastAPI error details", () => {
+    expect(parseErrorDetail('{"detail":"Table exists"}')).toBe("Table exists");
+    expect(
+      parseErrorDetail('{"detail":[{"loc":["body","memory_limit_mb"],"msg":"too small"}]}'),
+    ).toBe("memory_limit_mb: too small");
+    expect(parseErrorDetail("plain text")).toBe("plain text");
+  });
+
+  it("returns undefined for 204 responses", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(new BackendClient(info).delete("/api/tables/a/b")).resolves.toBeUndefined();
   });
 });

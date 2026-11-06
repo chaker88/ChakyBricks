@@ -1,17 +1,5 @@
-import { CalendarClock, Code2, Database, LayoutDashboard, NotebookPen } from "lucide-react";
+import { CalendarClock, Code2, LayoutDashboard, NotebookPen } from "lucide-react";
 import { EmptyState, Page } from "@/components/page";
-
-export function CatalogPage() {
-  return (
-    <Page title="Catalog" description="Schemas, tables and columns in your workspace.">
-      <EmptyState
-        icon={Database}
-        title="No tables yet"
-        description="Import a CSV, Parquet, JSON or Excel file to create your first Delta table. It becomes queryable from both SQL and Python."
-      />
-    </Page>
-  );
-}
 
 export function SqlPage() {
   return (

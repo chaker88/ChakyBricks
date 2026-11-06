@@ -2,12 +2,20 @@ import os
 import platform
 import sys
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from chakybricks import __version__
 from chakybricks.auth import TokenAuthMiddleware
+from chakybricks.config import app_home
+from chakybricks.errors import ChakyError
+from chakybricks.routes import router
+from chakybricks.services import Services
 
 ALLOWED_ORIGINS = [
     "http://localhost:1420",
@@ -17,11 +25,19 @@ ALLOWED_ORIGINS = [
 ]
 
 
-def create_app(token: str) -> FastAPI:
+def create_app(token: str, home: Path | None = None) -> FastAPI:
     if not token:
         raise ValueError("A session token is required")
 
-    app = FastAPI(title="ChakyBricks", version=__version__, docs_url=None, redoc_url=None)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.services = Services(home or app_home())
+        yield
+        app.state.services.close()
+
+    app = FastAPI(
+        title="ChakyBricks", version=__version__, docs_url=None, redoc_url=None, lifespan=lifespan
+    )
     started_at = time.time()
 
     app.add_middleware(TokenAuthMiddleware, token=token)
@@ -31,6 +47,11 @@ def create_app(token: str) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.include_router(router)
+
+    @app.exception_handler(ChakyError)
+    async def handle_error(_: Request, exc: ChakyError) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
 
     @app.get("/api/health")
     def health() -> dict[str, object]:
