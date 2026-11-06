@@ -28,6 +28,7 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - Debug builds: spawns `backend/.venv/Scripts/python.exe -m chakybricks` (override with `CHAKYBRICKS_PYTHON`).
   - Release builds: spawns `<resource_dir>/backend/chakybricks-backend.exe` (PyInstaller onedir, wired up in Phase 7).
   - Backend gets `--port N --watch-stdin` and the token via env `CHAKYBRICKS_TOKEN` (not argv, so it is not visible in process listings). `--watch-stdin` makes the backend exit when the shell's stdin pipe closes (covers shell crashes).
+  - The backend is always spawned with `CREATE_NO_WINDOW` (dev and release); its stdout/stderr are piped and forwarded to the shell's stderr prefixed with `[backend]`.
   - Custom title bar (`decorations: false`); window permissions in `capabilities/default.json`. CSP in `tauri.conf.json` allows `http/ws://127.0.0.1:*`.
 - `backend/chakybricks/` — FastAPI app (`app.py: create_app(token)`), `auth.py` ASGI middleware requires the token on every HTTP request (`X-ChakyBricks-Token` header) and WebSocket (`?token=` query param; rejected with close code 4401). CORS preflight passes without token. Entry point `__main__.py`.
 - `src/` — React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york, zinc, lucide).

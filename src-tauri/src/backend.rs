@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io::{BufRead, BufReader, Read};
 use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -29,11 +30,19 @@ impl Backend {
         command
             .args(["--port", &info.port.to_string(), "--watch-stdin"])
             .env(TOKEN_ENV, &info.token)
-            .stdin(Stdio::piped());
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         hide_console(&mut command);
-        let child = command
+        let mut child = command
             .spawn()
             .map_err(|e| format!("failed to start backend: {e}"))?;
+        if let Some(stdout) = child.stdout.take() {
+            forward_output(stdout);
+        }
+        if let Some(stderr) = child.stderr.take() {
+            forward_output(stderr);
+        }
         Ok(Self {
             info,
             child: Mutex::new(Some(child)),
@@ -99,14 +108,22 @@ fn backend_command(app: &AppHandle) -> Result<Command, Box<dyn Error>> {
     Ok(Command::new(exe))
 }
 
-#[cfg(all(windows, not(debug_assertions)))]
+fn forward_output(stream: impl Read + Send + 'static) {
+    std::thread::spawn(move || {
+        for line in BufReader::new(stream).lines().map_while(Result::ok) {
+            eprintln!("[backend] {line}");
+        }
+    });
+}
+
+#[cfg(windows)]
 fn hide_console(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     command.creation_flags(CREATE_NO_WINDOW);
 }
 
-#[cfg(not(all(windows, not(debug_assertions))))]
+#[cfg(not(windows))]
 fn hide_console(_command: &mut Command) {}
 
 #[cfg(test)]
