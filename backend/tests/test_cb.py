@@ -37,13 +37,6 @@ def test_sql_returns_polars(kernel_env: Services) -> None:
     assert cb.sql("SELECT 1; SELECT 2 AS two").item() == 2
 
 
-def test_sql_rejects_writes(kernel_env: Services) -> None:
-    with pytest.raises(InvalidInputError, match=r"cb.save"):
-        cb.sql("CREATE TABLE x AS SELECT 1")
-    with pytest.raises(InvalidInputError, match="not supported"):
-        cb.sql("SET threads = 1")
-
-
 def test_table_is_lazy_and_time_travels(kernel_env: Services) -> None:
     lf = cb.table("sales")
     assert isinstance(lf, pl.LazyFrame)
@@ -127,3 +120,30 @@ def test_sql_magic(kernel_env: Services) -> None:
     with pytest.raises(SqlCellError, match="identifier"):
         sql_magic("not a name", "SELECT 1")
     assert SqlCellError("boom")._render_traceback_() == ["\x1b[31mboom\x1b[0m"]
+
+
+def test_sql_supports_editor_writes(
+    kernel_env: Services, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cb.sql("CREATE TABLE copy AS SELECT * FROM sales WHERE region = 'north'") is None
+    assert capsys.readouterr().out == "Created main.copy with 2 rows · version 0\n"
+    assert (
+        cb.sql("INSERT INTO copy SELECT 4, 'west', 4.0; SELECT count(*) AS n FROM copy").item() == 3
+    )
+    assert "Inserted 1 rows into main.copy · version 1" in capsys.readouterr().out
+    assert kernel_env.catalog.get_table("main", "copy").version == 1
+    cb.sql("CREATE OR REPLACE TABLE copy AS SELECT 1 AS one")
+    assert cb.table("copy").collect().columns == ["one"]
+    cb.sql("ALTER TABLE copy RENAME TO renamed")
+    cb.sql("DROP TABLE renamed")
+    assert kernel_env.catalog.find_table("main", "renamed") is None
+    with pytest.raises(InvalidInputError, match="UPDATE statements are not supported"):
+        cb.sql("UPDATE sales SET amount = 0")
+
+
+def test_integer_sums_stay_integers(kernel_env: Services) -> None:
+    df = cb.sql("SELECT sum(id) AS total, sum(id)::HUGEINT * 10 AS big FROM sales")
+    assert df.schema["total"] == pl.Int64
+    assert df.row(0) == (6, 60)
+    huge = cb.sql("SELECT 170141183460469231731687303715884105727::HUGEINT AS h")
+    assert huge.schema["h"] != pl.Int64

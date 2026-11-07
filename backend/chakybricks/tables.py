@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import duckdb
 
@@ -13,7 +13,23 @@ from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.serialization import relation_to_json
 
 if TYPE_CHECKING:
-    from chakybricks.services import Services
+    from chakybricks.catalog import Catalog
+    from chakybricks.engine import Engine
+    from chakybricks.workspace import Workspace
+
+
+class TableContext(Protocol):
+    """What table operations need; the backend `Services` and the kernel context both fit."""
+
+    @property
+    def catalog(self) -> Catalog: ...
+
+    @property
+    def workspace(self) -> Workspace: ...
+
+    @property
+    def engine(self) -> Engine: ...
+
 
 MAX_SAMPLE_ROWS = 1000
 
@@ -30,7 +46,7 @@ def table_summary(table: TableInfo) -> dict[str, Any]:
     }
 
 
-def describe(services: Services, schema: str, name: str) -> dict[str, Any]:
+def describe(services: TableContext, schema: str, name: str) -> dict[str, Any]:
     table = services.catalog.get_table(schema, name)
     path = services.workspace.table_path(table.location)
     return {
@@ -43,7 +59,7 @@ def describe(services: Services, schema: str, name: str) -> dict[str, Any]:
 
 
 def sample(
-    services: Services, schema: str, name: str, limit: int, version: int | None = None
+    services: TableContext, schema: str, name: str, limit: int, version: int | None = None
 ) -> dict[str, Any]:
     table = services.catalog.get_table(schema, name)
     limit = max(1, min(limit, MAX_SAMPLE_ROWS))
@@ -59,12 +75,14 @@ def sample(
         return relation_to_json(con.sql(f"SELECT * FROM __cb_version LIMIT {limit}"))
 
 
-def history(services: Services, schema: str, name: str) -> list[dict[str, Any]]:
+def history(services: TableContext, schema: str, name: str) -> list[dict[str, Any]]:
     table = services.catalog.get_table(schema, name)
     return delta.history(services.workspace.table_path(table.location))
 
 
-def rename(services: Services, schema: str, name: str, new_schema: str, new_name: str) -> TableInfo:
+def rename(
+    services: TableContext, schema: str, name: str, new_schema: str, new_name: str
+) -> TableInfo:
     table = services.catalog.get_table(schema, name)
     new_schema = normalize_schema(new_schema)
     new_name = normalize_identifier(new_name, "table name")
@@ -88,7 +106,7 @@ def rename(services: Services, schema: str, name: str, new_schema: str, new_name
     return renamed
 
 
-def drop(services: Services, schema: str, name: str) -> None:
+def drop(services: TableContext, schema: str, name: str) -> None:
     table = services.catalog.get_table(schema, name)
     path = services.workspace.table_path(table.location)
     trash = services.workspace.tmp / f"dropped-{uuid.uuid4().hex}"

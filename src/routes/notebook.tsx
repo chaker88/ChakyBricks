@@ -10,11 +10,13 @@ import {
   RotateCcw,
   Square,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { CellEditorHandle, RunMode } from "@/components/notebook/cell-editor";
 import { InsertBar, NotebookCell } from "@/components/notebook/notebook-cell";
+import { RunningKernelsButton } from "@/components/notebook/running-kernels";
 import { EmptyState } from "@/components/page";
 import { QueryNameDialog } from "@/components/sql/query-name-dialog";
 import { Button } from "@/components/ui/button";
@@ -25,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCatalog } from "@/hooks/use-api";
+import { queryKeys, useCatalog } from "@/hooks/use-api";
 import { useKernel, type KernelEvent, type KernelStatus } from "@/hooks/use-kernel";
 import { useNotebook, useRenameNotebook, useSaveNotebook } from "@/hooks/use-notebooks";
 import { setCompletionTables } from "@/lib/monaco";
@@ -81,45 +83,56 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
   const dirty = useRef(false);
   const navigate = useNavigate();
   const catalog = useCatalog();
+  const queryClient = useQueryClient();
   const { mutate: saveNotebook } = useSaveNotebook(name);
   const rename = useRenameNotebook();
 
-  const onEvent = useCallback((event: KernelEvent) => {
-    switch (event.type) {
-      case "started":
-        dispatch({ type: "started", id: event.cell_id, executionCount: event.execution_count });
-        break;
-      case "output":
-        dispatch({ type: "output", id: event.cell_id, output: event.output });
-        break;
-      case "clear_output":
-        dispatch({ type: "clear-output", id: event.cell_id, wait: event.wait });
-        break;
-      case "done":
-        dispatch({
-          type: "done",
-          id: event.cell_id,
-          status: event.status,
-          durationMs: event.duration_ms,
-        });
-        break;
-      case "error":
-        if (event.cell_id) {
+  const onEvent = useCallback(
+    (event: KernelEvent) => {
+      switch (event.type) {
+        case "started":
+          dispatch({ type: "started", id: event.cell_id, executionCount: event.execution_count });
+          break;
+        case "output":
+          dispatch({ type: "output", id: event.cell_id, output: event.output });
+          break;
+        case "clear_output":
+          dispatch({ type: "clear-output", id: event.cell_id, wait: event.wait });
+          break;
+        case "done":
           dispatch({
-            type: "output",
+            type: "done",
             id: event.cell_id,
-            output: { output_type: "error", ename: "Error", evalue: event.message, traceback: [] },
+            status: event.status,
+            durationMs: event.duration_ms,
           });
-          dispatch({ type: "done", id: event.cell_id, status: "error", durationMs: null });
-        } else toast.error(event.message);
-        break;
-      case "status":
-        if (event.state === "restarting" || event.state === "dead") {
-          dispatch({ type: "kernel-reset" });
-        }
-        break;
-    }
-  }, []);
+          void queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
+          void queryClient.invalidateQueries({ queryKey: ["table"] });
+          break;
+        case "error":
+          if (event.cell_id) {
+            dispatch({
+              type: "output",
+              id: event.cell_id,
+              output: {
+                output_type: "error",
+                ename: "Error",
+                evalue: event.message,
+                traceback: [],
+              },
+            });
+            dispatch({ type: "done", id: event.cell_id, status: "error", durationMs: null });
+          } else toast.error(event.message);
+          break;
+        case "status":
+          if (event.state === "restarting" || event.state === "dead") {
+            dispatch({ type: "kernel-reset" });
+          }
+          break;
+      }
+    },
+    [queryClient],
+  );
 
   const kernel = useKernel(name, onEvent);
 
@@ -236,6 +249,7 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
           {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : "Saved"}
         </span>
         <div className="flex-1" />
+        <RunningKernelsButton />
         <Button size="sm" className="h-7 text-xs" disabled={!kernel.ready} onClick={runAll}>
           <Play />
           Run all

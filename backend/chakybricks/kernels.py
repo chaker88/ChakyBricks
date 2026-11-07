@@ -1,20 +1,21 @@
 import logging
-import os
 import queue
-import sys
 import threading
 import time
 import uuid
 from collections.abc import Callable
 from typing import Any
 
+import psutil
 from jupyter_client.blocking.client import BlockingKernelClient
 from jupyter_client.kernelspec import KernelSpec
 from jupyter_client.manager import KernelManager
 
+from chakybricks.catalog import now_iso
 from chakybricks.cb import MEMORY_ENV, WORKSPACE_ENV
-from chakybricks.config import Settings
+from chakybricks.config import MIN_MEMORY_LIMIT_MB, Settings
 from chakybricks.errors import NotFoundError
+from chakybricks.kernel_env import KernelEnvironment
 from chakybricks.workspace import Workspace
 
 log = logging.getLogger(__name__)
@@ -23,25 +24,37 @@ READY_TIMEOUT = 90
 COMPLETE_TIMEOUT = 5
 ALIVE_CHECK_SECONDS = 2
 BOOTSTRAP = "import chakybricks.kernel_init as __cb_init; __cb_init.setup(); del __cb_init"
-HIDDEN_ENV = ("CHAKYBRICKS_TOKEN",)
 BOOTSTRAP_CELL = "__bootstrap__"
 
 Listener = Callable[[dict[str, Any]], None]
 
 
-def kernel_argv() -> list[str]:
-    """Kernels re-invoke this process' executable: the frozen backend or the venv Python."""
-    if getattr(sys, "frozen", False):
-        return [sys.executable, "--kernel", "-f", "{connection_file}"]
-    return [sys.executable, "-m", "chakybricks", "--kernel", "-f", "{connection_file}"]
+def kernel_argv(environment: KernelEnvironment) -> list[str]:
+    """Kernels run ipykernel from the workspace's notebook environment."""
+    return [str(environment.python), "-m", "ipykernel_launcher", "-f", "{connection_file}"]
+
+
+def kernel_memory_limit_mb(settings: Settings) -> int:
+    return max(
+        MIN_MEMORY_LIMIT_MB,
+        settings.effective_memory_limit_mb * settings.kernel_memory_percent // 100,
+    )
 
 
 class KernelSession:
-    def __init__(self, notebook: str, workspace: Workspace, settings: Settings) -> None:
+    def __init__(
+        self,
+        notebook: str,
+        workspace: Workspace,
+        settings: Settings,
+        environment: KernelEnvironment,
+    ) -> None:
         self.id = uuid.uuid4().hex
         self.notebook = notebook
         self.workspace = workspace
         self.settings = settings
+        self.environment = environment
+        self.started_at = now_iso()
         self.status = "starting"
         self._manager: KernelManager | None = None
         self._client: BlockingKernelClient | None = None
@@ -68,7 +81,7 @@ class KernelSession:
     def start(self) -> None:
         manager = KernelManager()
         manager._kernel_spec = KernelSpec(
-            argv=kernel_argv(),
+            argv=kernel_argv(self.environment),
             display_name="ChakyBricks (Python 3.12)",
             language="python",
             interrupt_mode="signal",
@@ -127,17 +140,42 @@ class KernelSession:
                 log.exception("Kernel %s did not shut down cleanly", self.id)
         self._set_status("dead")
 
+    @property
+    def pid(self) -> int | None:
+        provisioner = self._manager.provisioner if self._manager else None
+        pid = getattr(provisioner, "pid", None)
+        return int(pid) if pid else None
+
+    def memory_bytes(self) -> int | None:
+        if self.pid is None or self.status == "dead":
+            return None
+        try:
+            process = psutil.Process(self.pid)
+            tree = [process, *process.children(recursive=True)]
+            return int(sum(p.memory_info().rss for p in tree))
+        except psutil.Error:
+            return None
+
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "notebook": self.notebook, "status": self.status}
+        return {
+            "id": self.id,
+            "notebook": self.notebook,
+            "status": self.status,
+            "pid": self.pid,
+            "started_at": self.started_at,
+            "memory_bytes": self.memory_bytes(),
+            "memory_limit_mb": kernel_memory_limit_mb(self.settings),
+        }
 
     def _environment(self) -> dict[str, str]:
-        env = {k: v for k, v in os.environ.items() if k not in HIDDEN_ENV}
-        env[WORKSPACE_ENV] = str(self.workspace.root)
-        env[MEMORY_ENV] = str(self.settings.effective_memory_limit_mb)
-        env["PLOTLY_RENDERER"] = "plotly_mimetype"
-        env["PYTHONIOENCODING"] = "utf-8"
-        env["MPLBACKEND"] = "module://matplotlib_inline.backend_inline"
-        return env
+        return self.environment.environment(
+            {
+                WORKSPACE_ENV: str(self.workspace.root),
+                MEMORY_ENV: str(kernel_memory_limit_mb(self.settings)),
+                "PLOTLY_RENDERER": "plotly_mimetype",
+                "MPLBACKEND": "module://matplotlib_inline.backend_inline",
+            }
+        )
 
     def _connect(self) -> None:
         assert self._manager is not None
@@ -339,9 +377,15 @@ class KernelSession:
 
 
 class KernelRegistry:
-    def __init__(self, workspace: Workspace, settings: Callable[[], Settings]) -> None:
+    def __init__(
+        self,
+        workspace: Workspace,
+        settings: Callable[[], Settings],
+        environment: KernelEnvironment,
+    ) -> None:
         self.workspace = workspace
         self.settings = settings
+        self.environment = environment
         self._sessions: dict[str, KernelSession] = {}
         self._lock = threading.Lock()
 
@@ -350,9 +394,10 @@ class KernelRegistry:
             for session in self._sessions.values():
                 if session.notebook == notebook and session.status != "dead":
                     return session
-            session = KernelSession(notebook, self.workspace, self.settings())
+            session = KernelSession(notebook, self.workspace, self.settings(), self.environment)
             self._sessions[session.id] = session
         try:
+            self.environment.ensure()
             session.start()
         except Exception:
             with self._lock:

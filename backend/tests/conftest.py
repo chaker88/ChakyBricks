@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chakybricks.app import create_app
+from chakybricks.kernel_env import VENV_ENV
 from chakybricks.services import Services
 
 TOKEN = "test-token"
@@ -87,3 +89,16 @@ def make_big_csv(path: Path, rows: int) -> Path:
             f"FROM range({rows}) t(i)) TO '{path.as_posix()}' (HEADER)"
         )
     return path
+
+
+@pytest.fixture(scope="session", autouse=True)
+def shared_kernel_venv(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
+    """Creating a venv with pip takes seconds, so tests share one notebook environment."""
+    path = tmp_path_factory.mktemp("kernel-env") / "venv"
+    previous = os.environ.get(VENV_ENV)
+    os.environ[VENV_ENV] = str(path)
+    yield path
+    if previous is None:
+        os.environ.pop(VENV_ENV, None)
+    else:
+        os.environ[VENV_ENV] = previous

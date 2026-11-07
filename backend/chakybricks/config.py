@@ -11,6 +11,7 @@ MIN_MEMORY_LIMIT_MB = 256
 DEFAULT_ROW_LIMIT = 10_000
 MIN_ROW_LIMIT = 100
 MAX_ROW_LIMIT = 1_000_000
+DEFAULT_KERNEL_MEMORY_PERCENT = 50
 
 
 def app_home() -> Path:
@@ -34,6 +35,7 @@ class Settings(BaseModel):
     workspace: Path
     memory_limit_mb: int | None = Field(default=None, ge=MIN_MEMORY_LIMIT_MB)
     row_limit: int = Field(default=DEFAULT_ROW_LIMIT, ge=MIN_ROW_LIMIT, le=MAX_ROW_LIMIT)
+    kernel_memory_percent: int = Field(default=DEFAULT_KERNEL_MEMORY_PERCENT, ge=10, le=100)
 
     @property
     def effective_memory_limit_mb(self) -> int:

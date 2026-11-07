@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from chakybricks import tables
 from chakybricks.errors import ConflictError, NotFoundError, QueryCancelledError, QueryError
@@ -11,7 +11,13 @@ from chakybricks.ingest.sources import ColumnSpec
 from chakybricks.statements import WriteAction, WriteStatement
 
 if TYPE_CHECKING:
-    from chakybricks.services import Services
+    from chakybricks.ingest.jobs import ImportManager
+
+
+class WriteContext(tables.TableContext, Protocol):
+    @property
+    def imports(self) -> ImportManager: ...
+
 
 POLL_SECONDS = 0.05
 
@@ -19,7 +25,7 @@ POLL_SECONDS = 0.05
 class SqlWriter:
     """Executes editor write statements on Delta tables and the catalog, never in DuckDB."""
 
-    def __init__(self, services: Services) -> None:
+    def __init__(self, services: WriteContext) -> None:
         self.services = services
 
     def cancel_job(self, job_id: str) -> None:
@@ -87,10 +93,15 @@ class SqlWriter:
         )
         job = self.services.imports.submit(request)
         on_job(job.id)
-        while not job.done:
-            if cancelled():
-                self.services.imports.cancel(job.id)
-            time.sleep(POLL_SECONDS)
+        try:
+            while not job.done:
+                if cancelled():
+                    self.services.imports.cancel(job.id)
+                time.sleep(POLL_SECONDS)
+        except BaseException:
+            self.services.imports.cancel(job.id)
+            self.services.imports.wait(job.id, timeout=30)
+            raise
         if job.state == ImportState.CANCELLED:
             raise QueryCancelledError()
         if job.state == ImportState.FAILED:

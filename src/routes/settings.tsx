@@ -1,6 +1,8 @@
-import { FolderOpen, Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { FolderOpen, Monitor, Moon, Package, Sun, type LucideIcon } from "lucide-react";
+import { Link } from "react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { RunningKernelsList } from "@/components/notebook/running-kernels";
 import { Page } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,23 @@ export function SettingsPage() {
         >
           <RowLimitSetting />
         </SettingRow>
+        <SettingRow
+          label="Notebook kernel memory"
+          description="Share of the memory limit each notebook kernel's query engine may use. Applies to kernels started afterwards."
+        >
+          <KernelMemorySetting />
+        </SettingRow>
+        <SettingRow
+          label="Python packages"
+          description="Packages available to notebooks: install, uninstall or reset to defaults."
+        >
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/settings/packages">
+              <Package />
+              Manage packages
+            </Link>
+          </Button>
+        </SettingRow>
         <SettingRow label="Engine" description="Local backend process status.">
           <span className="text-xs text-muted-foreground">
             {backend.status === "ready"
@@ -73,7 +92,53 @@ export function SettingsPage() {
           </span>
         </SettingRow>
       </div>
+
+      <section className="mt-8">
+        <h2 className="mb-2 text-sm font-medium">Running kernels</h2>
+        <div className="rounded-xl border">
+          <RunningKernelsList />
+        </div>
+      </section>
     </Page>
+  );
+}
+
+const KERNEL_SHARES = [25, 50, 75, 100];
+
+function KernelMemorySetting() {
+  const settings = useSettings();
+  const update = useUpdateSettings();
+  if (!settings.data) return <Skeleton className="h-8 w-48" />;
+  const { kernel_memory_percent, effective_memory_limit_mb } = settings.data;
+  return (
+    <div className="flex items-center gap-2">
+      <div role="radiogroup" className="flex gap-1 rounded-lg bg-muted p-1">
+        {KERNEL_SHARES.map((share) => (
+          <button
+            key={share}
+            role="radio"
+            aria-checked={kernel_memory_percent === share}
+            onClick={() =>
+              update.mutate(
+                { kernel_memory_percent: share },
+                { onError: (error) => toast.error(error.message) },
+              )
+            }
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+              kernel_memory_percent === share
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {share}%
+          </button>
+        ))}
+      </div>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        ≈ {((effective_memory_limit_mb * kernel_memory_percent) / 100 / 1024).toFixed(1)} GB
+      </span>
+    </div>
   );
 }
 

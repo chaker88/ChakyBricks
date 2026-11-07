@@ -1,6 +1,7 @@
 import queue
 import time
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
@@ -12,6 +13,7 @@ from chakybricks.kernels import KernelSession
 from chakybricks.services import Services
 from tests.conftest import TOKEN
 from tests.test_sql import add_table
+from tests.wheels import build_wheel
 
 
 class Recorder:
@@ -197,3 +199,66 @@ def test_kernel_websocket(client: TestClient) -> None:
     assert client.post(f"/api/kernels/{kernel['id']}/interrupt").status_code == 200
     assert client.delete(f"/api/kernels/{kernel['id']}").status_code == 204
     assert client.post(f"/api/kernels/{kernel['id']}/restart").status_code == 404
+
+
+def test_kernel_runs_in_the_workspace_environment(
+    kernel: tuple[Services, KernelSession, Recorder],
+    tmp_path: Path,
+) -> None:
+    services, session, recorder = kernel
+    events = recorder.run(
+        "prefix",
+        "import sys, os\nprint(sys.prefix)\nprint(os.environ['CHAKYBRICKS_KERNEL_MEMORY_MB'])",
+    )
+    prefix, memory = stdout(events).split()
+    assert Path(prefix) == services.kernel_env.path
+    assert int(memory) == services.settings.effective_memory_limit_mb // 2
+
+    wheels = tmp_path / "wheels"
+    build_wheel(wheels)
+    events = recorder.run(
+        "pip", f"%pip install --no-index --find-links {wheels.as_posix()} chakytiny", timeout=120
+    )
+    assert "Successfully installed chakytiny-1.0" in stdout(events), events
+    assert stdout(recorder.run("use", "import chakytiny\nprint(chakytiny.VALUE)")) == "42\n"
+    assert any(p.name == "chakytiny" for p in services.kernel_env.installed())
+
+    events = recorder.run("shell", "!echo hello from the shell")
+    assert "hello from the shell" in stdout(events)
+
+    info = session.to_dict()
+    assert info["pid"] and info["memory_bytes"] > 10_000_000
+    assert info["memory_limit_mb"] == services.settings.effective_memory_limit_mb // 2
+    recorder.run("cleanup", "%pip uninstall -y chakytiny", timeout=120)
+
+
+def test_sql_cells_support_writes(kernel: tuple[Services, KernelSession, Recorder]) -> None:
+    services, _, recorder = kernel
+    events = recorder.run(
+        "ctas", "%%sql\nCREATE TABLE reports.big AS SELECT * FROM sales WHERE amount > 1"
+    )
+    assert stdout(events) == "Created reports.big with 2 rows · version 0\n"
+    assert not [o for o in outputs(events) if o["output_type"] == "execute_result"]
+    assert services.catalog.get_table("reports", "big").row_count == 2
+
+    events = recorder.run(
+        "insert",
+        "%%sql\nINSERT INTO reports.big SELECT 9, 9.0;\nSELECT count(*) AS n FROM reports.big",
+    )
+    assert stdout(events) == "Inserted 1 rows into reports.big · version 1\n"
+    assert outputs(events)[-1]["data"][TABLE_MIME]["rows"] == [[3]]
+    result = services.sql.run("SELECT sum(amount) FROM reports.big", "after-kernel-write")
+    assert result["rows"] == [[14.0]]
+
+    events = recorder.run("conflict", "%%sql\nCREATE TABLE reports.big AS SELECT 1 AS x")
+    error = outputs(events)[-1]
+    assert error["output_type"] == "error"
+    assert "already exists" in "".join(error["traceback"])
+
+    events = recorder.run("rename", "print(cb.sql('ALTER TABLE reports.big RENAME TO small'))")
+    assert stdout(events) == "Renamed reports.big to reports.small\nNone\n"
+    recorder.run("drop", "%%sql\nDROP TABLE reports.small")
+    assert services.catalog.find_table("reports", "small") is None
+
+    events = recorder.run("rejected", "%%sql\nUPDATE sales SET amount = 0")
+    assert "UPDATE statements are not supported" in "".join(outputs(events)[-1]["traceback"])

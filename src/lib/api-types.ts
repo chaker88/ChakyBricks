@@ -98,6 +98,8 @@ export interface AppSettings {
   default_memory_limit_mb: number;
   total_memory_mb: number;
   row_limit: number;
+  kernel_memory_percent: number;
+  kernel_memory_limit_mb: number;
 }
 
 export interface WriteOutcome {
@@ -159,4 +161,42 @@ export interface ExportResult {
   path: string;
   size_bytes: number;
   elapsed_ms: number;
+}
+
+export interface KernelSummary {
+  id: string;
+  notebook: string;
+  status: string;
+  pid: number | null;
+  started_at: string;
+  memory_bytes: number | null;
+  memory_limit_mb: number;
+}
+
+export interface PackageInfo {
+  name: string;
+  version: string;
+  overridden?: boolean;
+}
+
+export interface PackageListing {
+  environment: {
+    path: string;
+    python: string;
+    python_version: string;
+    ready: boolean;
+    created_at: string | null;
+  };
+  installed: PackageInfo[];
+  defaults: PackageInfo[];
+}
+
+export interface PackageJob {
+  id: string;
+  action: "install" | "uninstall" | "reset";
+  packages: string[];
+  state: "queued" | "running" | "succeeded" | "failed";
+  output: string;
+  error: string | null;
+  elapsed_seconds: number;
 }

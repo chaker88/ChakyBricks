@@ -13,6 +13,7 @@ import duckdb
 import pandas as pd
 import polars as pl
 import pyarrow as pa
+import pyarrow.compute as pc
 from deltalake import write_deltalake
 
 from chakybricks import delta
@@ -20,9 +21,11 @@ from chakybricks.catalog import Catalog, parse_full_name
 from chakybricks.config import Settings
 from chakybricks.engine import Engine, quote_ident
 from chakybricks.errors import InvalidInputError, NotFoundError
+from chakybricks.ingest.jobs import ImportManager
 from chakybricks.ingest.sources import sanitize_column_names, storage_type
 from chakybricks.statements import parse_statements
 from chakybricks.workspace import Workspace
+from chakybricks.writes import SqlWriter
 
 WORKSPACE_ENV = "CHAKYBRICKS_KERNEL_WORKSPACE"
 MEMORY_ENV = "CHAKYBRICKS_KERNEL_MEMORY_MB"
@@ -36,6 +39,7 @@ class _Context:
     workspace: Workspace
     catalog: Catalog
     engine: Engine
+    imports: ImportManager
 
 
 @cache
@@ -47,23 +51,46 @@ def _context() -> _Context:
     workspace = Workspace(Path(root)).ensure()
     settings = Settings(workspace=workspace.root, memory_limit_mb=int(memory) if memory else None)
     catalog = Catalog(workspace.meta_db)
-    return _Context(workspace, catalog, Engine(catalog, workspace, settings))
+    engine = Engine(catalog, workspace, settings)
+    return _Context(workspace, catalog, engine, ImportManager(workspace, catalog, engine))
 
 
-def sql(query: str) -> pl.DataFrame:
-    """Runs SQL over the catalog and returns the last statement's result as a Polars DataFrame."""
-    statements = parse_statements(query)
-    writes = [s for s in statements if s.write is not None]
-    if writes:
-        raise InvalidInputError(
-            "cb.sql runs read-only queries. Create or change tables with "
-            'cb.save(df, "schema.table"), or use the SQL editor for CREATE/INSERT/DROP.'
-        )
-    with _context().engine.cursor() as cur:
-        for statement in statements[:-1]:
-            cur.sql(statement.sql).to_arrow_table()
-        result = cur.sql(statements[-1].sql).to_arrow_table()
-    return pl.from_arrow(result)  # type: ignore[return-value]
+@cache
+def _writer() -> SqlWriter:
+    return SqlWriter(_context())
+
+
+def sql(query: str) -> pl.DataFrame | None:
+    """Runs SQL over the catalog, like the SQL editor (including Delta-backed writes).
+
+    Returns the last statement's result as a Polars DataFrame, or None when it was a write.
+    """
+    result: pl.DataFrame | None = None
+    for statement in parse_statements(query):
+        if statement.write is not None:
+            outcome = _writer().execute(
+                statement.write, on_job=lambda _: None, cancelled=lambda: False
+            )
+            print(outcome["message"])
+            result = None
+            continue
+        with _context().engine.cursor() as cur:
+            rel = cur.sql(statement.sql)
+            table = _narrow_hugeints(rel.to_arrow_table(), [str(t) for t in rel.types])
+        result = pl.from_arrow(table)  # type: ignore[assignment]
+    return result
+
+
+def _narrow_hugeints(table: pa.Table, types: list[str]) -> pa.Table:
+    """DuckDB's sum() of integers is HUGEINT (decimal128 in Arrow); use int64 when values fit."""
+    for index, kind in enumerate(types):
+        if kind in ("HUGEINT", "UHUGEINT"):
+            try:
+                column = pc.cast(table.column(index), pa.int64(), safe=True)
+            except (pa.ArrowInvalid, pa.ArrowNotImplementedError):
+                continue
+            table = table.set_column(index, table.field(index).with_type(pa.int64()), column)
+    return table
 
 
 def table(name: str, version: int | None = None) -> pl.LazyFrame:

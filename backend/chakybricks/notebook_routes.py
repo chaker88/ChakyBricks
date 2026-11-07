@@ -89,6 +89,35 @@ def shutdown_kernel(kernel_id: str, services: ServicesDep) -> None:
     services.kernels.shutdown(kernel_id)
 
 
+class PackageInstall(BaseModel):
+    packages: str
+
+
+@router.get("/api/packages")
+def list_packages(services: ServicesDep) -> dict[str, Any]:
+    return services.packages.listing()
+
+
+@router.post("/api/packages/install", status_code=202)
+def install_packages(body: PackageInstall, services: ServicesDep) -> dict[str, Any]:
+    return services.packages.install(body.packages).to_dict()
+
+
+@router.post("/api/packages/{name}/uninstall", status_code=202)
+def uninstall_package(name: str, services: ServicesDep) -> dict[str, Any]:
+    return services.packages.uninstall(name).to_dict()
+
+
+@router.post("/api/packages/reset", status_code=202)
+def reset_packages(services: ServicesDep) -> dict[str, Any]:
+    return services.packages.reset().to_dict()
+
+
+@router.get("/api/packages/jobs/{job_id}")
+def package_job(job_id: str, services: ServicesDep) -> dict[str, Any]:
+    return services.packages.get(job_id).to_dict()
+
+
 @router.websocket("/ws/kernels/{kernel_id}")
 async def kernel_socket(websocket: WebSocket, kernel_id: str) -> None:
     services: Services = websocket.app.state.services

@@ -188,6 +188,7 @@ export function useUpdateSettings() {
       workspace?: string;
       memory_limit_mb?: number | null;
       row_limit?: number;
+      kernel_memory_percent?: number;
     }) => requireClient(client).put<AppSettings>("/api/settings", changes),
     onSuccess: (settings, changes) => {
       queryClient.setQueryData(queryKeys.settings, settings);

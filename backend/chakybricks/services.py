@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 
@@ -6,12 +7,16 @@ from chakybricks.config import Settings, SettingsStore
 from chakybricks.engine import Engine
 from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.ingest.jobs import ImportManager
+from chakybricks.kernel_env import VENV_ENV, KernelEnvironment
 from chakybricks.kernels import KernelRegistry
 from chakybricks.notebooks import NotebookStore
+from chakybricks.packages import PackageManager
 from chakybricks.queries import QueryStore
 from chakybricks.sql import QueryRunner
 from chakybricks.workspace import Workspace
 from chakybricks.writes import SqlWriter
+
+KERNEL_VENV_DIR = ".venv"
 
 
 class Services:
@@ -28,7 +33,12 @@ class Services:
         self.imports = ImportManager(self.workspace, self.catalog, self.engine)
         self.queries = QueryStore(self.catalog)
         self.notebooks = NotebookStore(self.workspace.notebooks)
-        self.kernels = KernelRegistry(self.workspace, lambda: self.settings)
+        venv = os.environ.get(VENV_ENV)
+        self.kernel_env = KernelEnvironment(
+            Path(venv) if venv else self.workspace.root / KERNEL_VENV_DIR
+        )
+        self.kernels = KernelRegistry(self.workspace, lambda: self.settings, self.kernel_env)
+        self.packages = PackageManager(self.kernel_env, before_reset=self.kernels.shutdown_all)
         self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings, SqlWriter(self))
 
     def update_settings(self, changes: dict[str, object]) -> Settings:
@@ -53,5 +63,6 @@ class Services:
 
     def close(self) -> None:
         self.kernels.shutdown_all()
+        self.packages.shutdown()
         self.imports.shutdown()
         self.engine.close()

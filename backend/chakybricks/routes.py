@@ -22,6 +22,7 @@ from chakybricks.ingest.sources import (
     preview,
     resolve_source,
 )
+from chakybricks.kernels import kernel_memory_limit_mb
 from chakybricks.services import Services
 
 router = APIRouter(prefix="/api")
@@ -39,6 +40,7 @@ class SettingsUpdate(BaseModel):
     workspace: str | None = None
     memory_limit_mb: int | None = Field(default=None, ge=MIN_MEMORY_LIMIT_MB)
     row_limit: int | None = Field(default=None, ge=MIN_ROW_LIMIT, le=MAX_ROW_LIMIT)
+    kernel_memory_percent: int | None = Field(default=None, ge=10, le=100)
 
 
 class SchemaCreate(BaseModel):
@@ -66,6 +68,8 @@ def _settings_payload(services: Services) -> dict[str, Any]:
         "default_memory_limit_mb": default_memory_limit_mb(),
         "total_memory_mb": total_memory_mb(),
         "row_limit": settings.row_limit,
+        "kernel_memory_percent": settings.kernel_memory_percent,
+        "kernel_memory_limit_mb": kernel_memory_limit_mb(settings),
     }
 
 
@@ -83,6 +87,8 @@ def update_settings(body: SettingsUpdate, services: ServicesDep) -> dict[str, An
         changes["memory_limit_mb"] = body.memory_limit_mb
     if body.row_limit is not None:
         changes["row_limit"] = body.row_limit
+    if body.kernel_memory_percent is not None:
+        changes["kernel_memory_percent"] = body.kernel_memory_percent
     services.update_settings(changes)
     return _settings_payload(services)
 

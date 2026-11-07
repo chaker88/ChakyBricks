@@ -30,6 +30,9 @@ impl Backend {
         command
             .args(["--port", &info.port.to_string(), "--watch-stdin"])
             .env(TOKEN_ENV, &info.token)
+            .env_remove("PYTHONHOME")
+            .env_remove("PYTHONPATH")
+            .env("PYTHONNOUSERSITE", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -100,12 +103,13 @@ fn backend_command(_app: &AppHandle) -> Result<Command, Box<dyn Error>> {
 #[cfg(not(debug_assertions))]
 fn backend_command(app: &AppHandle) -> Result<Command, Box<dyn Error>> {
     use tauri::Manager;
-    let exe = app
-        .path()
-        .resource_dir()?
-        .join("backend")
-        .join("chakybricks-backend.exe");
-    Ok(Command::new(exe))
+    let python = app.path().resource_dir()?.join("python").join("python.exe");
+    if !python.exists() {
+        return Err(format!("bundled Python runtime not found at {}", python.display()).into());
+    }
+    let mut command = Command::new(python);
+    command.args(["-m", "chakybricks"]);
+    Ok(command)
 }
 
 fn forward_output(stream: impl Read + Send + 'static) {

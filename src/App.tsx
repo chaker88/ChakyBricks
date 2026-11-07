@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CatalogHome, CatalogLayout } from "@/routes/catalog";
 import { HomePage } from "@/routes/home";
 import { NotebooksPage } from "@/routes/notebooks";
+import { PackagesPage } from "@/routes/packages";
 import { DashboardsPage, JobsPage } from "@/routes/sections";
 import { SettingsPage } from "@/routes/settings";
 import { TablePage } from "@/routes/table-page";
@@ -63,6 +64,7 @@ export function App() {
                     <Route path="dashboards" element={<DashboardsPage />} />
                     <Route path="jobs" element={<JobsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="settings/packages" element={<PackagesPage />} />
                   </Route>
                 </Routes>
               </ImportProvider>

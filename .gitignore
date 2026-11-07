@@ -21,3 +21,7 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Bundled Python runtime and build outputs
+src-tauri/resources/python/
+build/
