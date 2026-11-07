@@ -34,7 +34,7 @@ export function HomePage() {
       label: "New notebook",
       description: "Python, SQL and Markdown cells",
       icon: NotebookPen,
-      onClick: comingSoon("Notebooks"),
+      onClick: () => navigate("/notebooks?new=1"),
     },
     {
       label: "New query",

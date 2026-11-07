@@ -18,6 +18,16 @@ dependencies = [
     "psutil>=7.2",
     "pytz>=2025.2",
     "tzdata>=2025.2",
+    "polars>=2.1",
+    "numpy>=2.5",
+    "ipykernel>=7.4",
+    "jupyter_client>=8.10",
+    "nbformat>=5.11",
+    "matplotlib>=3.11",
+    "matplotlib-inline>=0.2",
+    "plotly>=7.1",
+    "scikit-learn>=1.9",
+    "scipy>=1.18",
 ]
 
 [project.optional-dependencies]
@@ -53,3 +63,8 @@ packages = ["chakybricks"]
 [[tool.mypy.overrides]]
 module = ["pyarrow.*", "pandas.*", "psutil.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["chakybricks.notebooks"]
+disallow_untyped_calls = false
+warn_return_any = false

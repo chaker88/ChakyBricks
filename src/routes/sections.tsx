@@ -1,17 +1,5 @@
-import { CalendarClock, LayoutDashboard, NotebookPen } from "lucide-react";
+import { CalendarClock, LayoutDashboard } from "lucide-react";
 import { EmptyState, Page } from "@/components/page";
-
-export function NotebooksPage() {
-  return (
-    <Page title="Notebooks" description="Python notebooks with SQL and Markdown cells.">
-      <EmptyState
-        icon={NotebookPen}
-        title="No notebooks yet"
-        description="Notebooks run on a local Python kernel with pandas, Polars, DuckDB and the cb helper preloaded."
-      />
-    </Page>
-  );
-}
 
 export function DashboardsPage() {
   return (

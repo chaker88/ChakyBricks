@@ -3,11 +3,8 @@ import os
 import sys
 import threading
 
-import uvicorn
-
-from chakybricks.app import create_app
-
 TOKEN_ENV = "CHAKYBRICKS_TOKEN"
+KERNEL_FLAG = "--kernel"
 
 
 def _exit_when_stdin_closes() -> None:
@@ -27,7 +24,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def run_kernel(argv: list[str]) -> None:
+    """Notebook kernels re-invoke this executable, so the frozen app needs no system Python."""
+    from ipykernel.kernelapp import launch_new_instance
+
+    sys.argv = [sys.argv[0], *argv]
+    launch_new_instance()
+
+
 def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == KERNEL_FLAG:
+        run_kernel(argv[1:])
+        return
+
+    import uvicorn
+
+    from chakybricks.app import create_app
+
     args = parse_args(argv)
     token = os.environ.get(TOKEN_ENV)
     if not token:

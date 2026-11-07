@@ -14,6 +14,7 @@ from chakybricks import __version__
 from chakybricks.auth import TokenAuthMiddleware
 from chakybricks.config import app_home
 from chakybricks.errors import ChakyError
+from chakybricks.notebook_routes import router as notebook_router
 from chakybricks.routes import router
 from chakybricks.services import Services
 from chakybricks.sql_routes import router as sql_router
@@ -50,6 +51,7 @@ def create_app(token: str, home: Path | None = None) -> FastAPI:
     )
     app.include_router(router)
     app.include_router(sql_router)
+    app.include_router(notebook_router)
 
     @app.exception_handler(ChakyError)
     async def handle_error(_: Request, exc: ChakyError) -> JSONResponse:

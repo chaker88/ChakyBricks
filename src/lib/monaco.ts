@@ -99,3 +99,67 @@ export function disposeModel(tabId: string): void {
 }
 
 export { monaco };
+
+export interface KernelCompletion {
+  matches: string[];
+  cursorStart: number;
+  cursorEnd: number;
+}
+
+type PythonCompleter = (code: string, offset: number) => Promise<KernelCompletion>;
+
+const pythonCompleters = new Map<string, PythonCompleter>();
+const TABLE_ARGUMENT = /cb\.(?:table\(\s*|save\([^()]*,\s*)["']([^"']*)$/;
+
+export function setPythonCompleter(
+  model: monaco.editor.ITextModel,
+  completer: PythonCompleter | null,
+): void {
+  if (completer) pythonCompleters.set(model.uri.toString(), completer);
+  else pythonCompleters.delete(model.uri.toString());
+}
+
+monaco.languages.registerCompletionItemProvider("python", {
+  triggerCharacters: [".", '"', "'"],
+  async provideCompletionItems(model, position) {
+    const line = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+    const tableArgument = TABLE_ARGUMENT.exec(line);
+    if (tableArgument) {
+      const typed = tableArgument[1];
+      const range = new monaco.Range(
+        position.lineNumber,
+        position.column - typed.length,
+        position.lineNumber,
+        position.column,
+      );
+      return {
+        suggestions: completionTables.map((t) => {
+          const name = t.schema === "main" ? t.name : `${t.schema}.${t.name}`;
+          return {
+            label: name,
+            kind: monaco.languages.CompletionItemKind.Struct,
+            insertText: name,
+            detail: `${t.row_count.toLocaleString()} rows`,
+            range,
+          };
+        }),
+      };
+    }
+    const completer = pythonCompleters.get(model.uri.toString());
+    if (!completer) return { suggestions: [] };
+    const offset = model.getOffsetAt(position);
+    const reply = await completer(model.getValue(), offset);
+    const start = model.getPositionAt(reply.cursorStart);
+    const end = model.getPositionAt(reply.cursorEnd);
+    const range = new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
+    return {
+      suggestions: reply.matches.slice(0, 200).map((match, index) => ({
+        label: match,
+        kind: monaco.languages.CompletionItemKind.Variable,
+        insertText: match,
+        sortText: String(index).padStart(4, "0"),
+        range,
+      })),
+    };
+  },
+});

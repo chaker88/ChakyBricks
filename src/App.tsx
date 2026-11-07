@@ -10,11 +10,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CatalogHome, CatalogLayout } from "@/routes/catalog";
 import { HomePage } from "@/routes/home";
-import { DashboardsPage, JobsPage, NotebooksPage } from "@/routes/sections";
+import { NotebooksPage } from "@/routes/notebooks";
+import { DashboardsPage, JobsPage } from "@/routes/sections";
 import { SettingsPage } from "@/routes/settings";
 import { TablePage } from "@/routes/table-page";
 
 const SqlPage = lazy(() => import("@/routes/sql"));
+const NotebookPage = lazy(() => import("@/routes/notebook"));
 
 function createQueryClient() {
   return new QueryClient({
@@ -50,6 +52,14 @@ export function App() {
                       }
                     />
                     <Route path="notebooks" element={<NotebooksPage />} />
+                    <Route
+                      path="notebooks/:name"
+                      element={
+                        <Suspense fallback={<PageSkeleton />}>
+                          <NotebookPage />
+                        </Suspense>
+                      }
+                    />
                     <Route path="dashboards" element={<DashboardsPage />} />
                     <Route path="jobs" element={<JobsPage />} />
                     <Route path="settings" element={<SettingsPage />} />

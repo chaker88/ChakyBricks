@@ -96,3 +96,85 @@
     font-feature-settings: "cv11", "ss01";
   }
 }
+
+@layer components {
+  .markdown {
+    @apply text-sm leading-6 select-text;
+  }
+  .markdown h1 {
+    @apply mt-2 mb-3 text-2xl font-semibold tracking-tight;
+  }
+  .markdown h2 {
+    @apply mt-4 mb-2 text-xl font-semibold tracking-tight;
+  }
+  .markdown h3 {
+    @apply mt-3 mb-2 text-base font-semibold;
+  }
+  .markdown p,
+  .markdown ul,
+  .markdown ol,
+  .markdown pre,
+  .markdown blockquote,
+  .markdown table {
+    @apply my-2;
+  }
+  .markdown ul {
+    @apply list-disc pl-6;
+  }
+  .markdown ol {
+    @apply list-decimal pl-6;
+  }
+  .markdown a {
+    @apply text-primary underline underline-offset-2;
+  }
+  .markdown code {
+    @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .markdown pre {
+    @apply overflow-auto rounded-md bg-muted p-3;
+  }
+  .markdown pre code {
+    @apply bg-transparent p-0;
+  }
+  .markdown blockquote {
+    @apply border-l-2 pl-3 text-muted-foreground;
+  }
+  .markdown table,
+  .html-output table {
+    @apply border-collapse text-xs;
+  }
+  .markdown th,
+  .markdown td,
+  .html-output th,
+  .html-output td {
+    @apply border px-2 py-1 text-left;
+  }
+  .markdown th,
+  .html-output th {
+    @apply bg-muted font-medium;
+  }
+  .ansi-black {
+    @apply text-zinc-500;
+  }
+  .ansi-red {
+    @apply text-red-600 dark:text-red-400;
+  }
+  .ansi-green {
+    @apply text-green-700 dark:text-green-400;
+  }
+  .ansi-yellow {
+    @apply text-amber-700 dark:text-amber-300;
+  }
+  .ansi-blue {
+    @apply text-blue-700 dark:text-blue-400;
+  }
+  .ansi-magenta {
+    @apply text-fuchsia-700 dark:text-fuchsia-400;
+  }
+  .ansi-cyan {
+    @apply text-cyan-700 dark:text-cyan-400;
+  }
+  .ansi-white {
+    @apply text-zinc-300;
+  }
+}
