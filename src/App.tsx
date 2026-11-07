@@ -12,12 +12,14 @@ import { CatalogHome, CatalogLayout } from "@/routes/catalog";
 import { HomePage } from "@/routes/home";
 import { NotebooksPage } from "@/routes/notebooks";
 import { PackagesPage } from "@/routes/packages";
-import { DashboardsPage, JobsPage } from "@/routes/sections";
+import { DashboardsPage } from "@/routes/dashboards";
+import { JobsPage } from "@/routes/sections";
 import { SettingsPage } from "@/routes/settings";
 import { TablePage } from "@/routes/table-page";
 
 const SqlPage = lazy(() => import("@/routes/sql"));
 const NotebookPage = lazy(() => import("@/routes/notebook"));
+const DashboardPage = lazy(() => import("@/routes/dashboard"));
 
 function createQueryClient() {
   return new QueryClient({
@@ -62,6 +64,14 @@ export function App() {
                       }
                     />
                     <Route path="dashboards" element={<DashboardsPage />} />
+                    <Route
+                      path="dashboards/:id"
+                      element={
+                        <Suspense fallback={<PageSkeleton />}>
+                          <DashboardPage />
+                        </Suspense>
+                      }
+                    />
                     <Route path="jobs" element={<JobsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="settings/packages" element={<PackagesPage />} />

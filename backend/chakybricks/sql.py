@@ -5,7 +5,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 import duckdb
 import pyarrow as pa
@@ -46,6 +46,8 @@ NUMERIC_PREFIXES = (
 UNORDERED_PREFIXES = ("STRUCT", "MAP", "UNION", "BLOB")
 
 ExportFormat = Literal["csv", "parquet"]
+T = TypeVar("T")
+READ_SLOTS = 4
 
 
 @dataclass
@@ -71,6 +73,7 @@ class QueryRunner:
         self.writer = writer
         self._runs: dict[str, _Run] = {}
         self._lock = threading.Lock()
+        self._read_slots = threading.BoundedSemaphore(READ_SLOTS)
 
     def run(self, sql: str, query_id: str, limit: int | None = None) -> dict[str, Any]:
         statements = parse_statements(sql)
@@ -147,6 +150,30 @@ class QueryRunner:
             "truncated": total > table.num_rows,
             "elapsed_ms": elapsed,
         }
+
+    def run_read(self, query_id: str, work: Callable[[duckdb.DuckDBPyConnection], T]) -> T:
+        """Runs read-only work on an engine cursor, cancellable by id, at most a few at a time."""
+        run = _Run()
+        try:
+            with self._track(query_id, run):
+                self._acquire_read_slot(run)
+                try:
+                    with self._use(run, self.engine.cursor()) as cur:
+                        self._raise_if_cancelled(run)
+                        return work(cur)
+                finally:
+                    self._read_slots.release()
+        except duckdb.Error as exc:
+            if run.cancelled or isinstance(exc, duckdb.InterruptException):
+                raise QueryCancelledError() from exc
+            raise QueryError(_error_message(exc)) from exc
+
+    def _acquire_read_slot(self, run: _Run) -> None:
+        while not self._read_slots.acquire(timeout=CANCEL_RETRY_SECONDS):
+            self._raise_if_cancelled(run)
+        if run.cancelled:
+            self._read_slots.release()
+            raise QueryCancelledError()
 
     def cancel(self, query_id: str) -> bool:
         with self._lock:

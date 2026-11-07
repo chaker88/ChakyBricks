@@ -8,7 +8,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
 import { EmptyState, Page } from "@/components/page";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCatalog } from "@/hooks/use-api";
@@ -21,7 +20,6 @@ export function HomePage() {
   const catalog = useCatalog();
   const { openImport } = useImport();
   const navigate = useNavigate();
-  const comingSoon = (label: string) => () => toast(`${label} is coming soon`);
 
   const actions: { label: string; description: string; icon: LucideIcon; onClick: () => void }[] = [
     {
@@ -46,7 +44,7 @@ export function HomePage() {
       label: "New dashboard",
       description: "Charts, KPIs and filters",
       icon: LayoutDashboard,
-      onClick: comingSoon("Dashboards"),
+      onClick: () => navigate("/dashboards?new=1"),
     },
   ];
 

@@ -2,9 +2,9 @@
 
 Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of truth**; follow it exactly and ask before deviating. Work is delivered phase by phase (see SPEC.md "Delivery phases"); at the end of each phase run all checks, confirm the app launches, commit, and stop for review.
 
-## Current status (2026-11-07)
+## Current status (2026-11-08)
 
-**Next: Phase 5 (dashboards)** — not started; the user will start it in a new session. Read SPEC.md §4 Dashboards and the Phase 5 line in "Delivery phases" first.
+**Phase 5 (dashboards) is implemented and awaiting the user's hand test** (checklist below). Next after approval: Phase 6 (jobs). Read SPEC.md §5 and the Phase 6 line first.
 
 ### Done and approved
 
@@ -21,6 +21,22 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 - Packages: **duckdb, deltalake, pyarrow, polars, numpy, pandas, ipykernel are pinned** to the bundled versions in every workspace venv (`chakybricks-constraints.txt` + venv `pip.ini` + `PIP_CONSTRAINT`), so user installs can't break `cb`. Refusals are explained in `%pip` output and on the Packages page (`kernel_env.explain_conflict`); `!pip` is refused too but shows pip's own message.
 - Notebook UX: "+ Code / + SQL / + Markdown" buttons on hover between cells and permanently at the bottom; "Add cell" (above/below) menu in each cell toolbar; keyboard shortcuts unchanged.
 - Builds must be clean automatically: `npm run build:app` removes stale outputs and fails if the bundled runtime contains packages outside the default list.
+
+### Phase 5 — still to test by hand
+
+Open Dashboards → **Sample dashboard** (generates `main.demo_sales`, 200k rows incl. an Arabic `الفئة` column, and "Sales overview (sample)"), then:
+
+- [ ] View mode: all 12 tiles render (text, 4 KPIs with comparison + sparkline, combo, donut, stacked bar, weekly line, heatmap, scatter, area, table); light and dark theme both look right.
+- [ ] Filters: date-range presets + custom range, Region multi-select (search box), Channel single-select, Arabic category filter, Unit price range; **Reset** restores defaults (last 90 days).
+- [ ] Cross-filtering: click a donut slice / bar / heatmap cell → other tiles filter, chip appears, clicking again or ✕ clears; Ctrl/Shift-click adds; the **Cross-filter on/off** toggle works.
+- [ ] Edit mode: drag by the tile header, resize from the edges/corner, duplicate, delete (button and Delete key), Save / Cancel (discard prompt), Ctrl+S, leaving with unsaved changes.
+- [ ] Tile builder: change chart type, dimension + date grain (day/week/month/quarter/year), breakdown, metrics (aggregation, label, number format), sort/limit, data labels; KPI comparison/trend; table columns; text markdown; switching a tile to a saved query.
+- [ ] Filters dialog: add/remove filters, "Use current value as default", filters on a saved-query source.
+- [ ] Style: palette (4), background, auto-refresh interval; Refresh button; expand a tile.
+- [ ] **Export → PNG and PDF** from the installed/dev app via the native save dialog (the file is written by `POST /api/export/file`); check Arabic text and charts appear.
+- [ ] Your 800 MB table: build a bar/line/KPI on it — first load fast, second load instant (cache), filters stay quick; watch memory.
+- [ ] Rename / duplicate / delete from the dashboards list; Home → "New dashboard".
+- [ ] Not yet done in a real `.exe`: `npm run build:app` and run the installed app (nothing in Phase 5 touches the runtime, but html-to-image/jspdf are new frontend deps).
 
 ### Known behaviour / open notes
 
@@ -71,6 +87,8 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - `kernel_env.py` — `KernelEnvironment`: the workspace notebook venv (`workspace/.venv`, override `CHAKYBRICKS_KERNEL_VENV`; tests share one per session). Created with `<base python> -m venv` (base = `sys._base_executable`, override `CHAKYBRICKS_BASE_PYTHON`) plus `_chakybricks_defaults.pth` containing `import site; site.addsitedir(<backend purelib>)` — so the venv sees the bundled defaults and `chakybricks` (editable installs too), works offline, `pip install` goes into the venv and shadows defaults, and pip refuses to uninstall defaults ("outside environment"). A marker file records Python version + defaults path; mismatch → recreated. `packages.py` — `PackageManager`: one-at-a-time pip jobs (install/uninstall/reset) with captured output; requirement strings validated (no pip options or paths); defaults can't be uninstalled; reset shuts down kernels then recreates the venv. Routes in `notebook_routes.py`: `/api/packages` (installed, defaults, `protected` pins), `/install`, `/{name}/uninstall`, `/reset`, `/jobs/{id}`. **Pins**: `KernelEnvironment.ensure()` (re)writes `chakybricks-constraints.txt` (`PROTECTED_PACKAGES` at their bundled versions) and `pip.ini` (`[install] constraint = …`) in the venv on every start, and `environment()` sets `PIP_CONSTRAINT` — together they cover `%pip`, `!pip`, the Packages page and pip run by hand. `kernel_init.pip_magic` replaces IPython's `%pip` (streams output, appends `explain_conflict` on refusal); `PackageManager` puts the explanation in the job error.
   - `cb.py` (runs in kernels) — `cb.sql` (Polars DataFrame, or `None` when the last statement is a write; writes go through `SqlWriter` with a kernel-side context holding catalog/workspace/engine/`ImportManager`, printing the same messages as the SQL editor; `tables.TableContext` / `writes.WriteContext` protocols let the backend `Services` and the kernel context share the code), `cb.table(name, version=)` (`pl.scan_delta`, lazy), `cb.save(df, name, mode, partition_by)` (Polars/pandas/Arrow/LazyFrame → DuckDB projection with `storage_type` + sanitized names → `write_deltalake` → catalog upsert, `source="notebook"`), `cb.tables()`. Builds its own `Engine` from the env-provided workspace. `kernel_init.py` — registers `cb`, mimebundle formatters for Polars/pandas/Arrow frames and series (`application/vnd.chakybricks.table+json`: first 1000 rows + total), `%%sql [var]` magic with short errors (`SqlCellError._render_traceback_`).
   - `notebook_routes.py` — `/api/notebooks` CRUD + rename, `/api/kernels` start/list/interrupt/restart/shutdown, `WS /ws/kernels/{id}?token=` (client sends `execute {cell_id, code}` and `complete {request_id, code, cursor_pos}`; server pushes kernel events and `complete_reply`).
+  - Dashboards (Phase 5): `dashboard_models.py` (pydantic spec; `Flexible` models keep frontend-only fields), `dashboards.py` `DashboardStore` (meta.db migration 3; spec stored as JSON; unique case-insensitive names; tile/filter ids unique), `dashboard_query.py` `DashboardQueries` (no-code builder → SQL; **all values are bound parameters**, identifiers quoted from validated source columns; conditions whose column is not in a tile's source are ignored — that is how one filter scopes to tiles; output aliases `_d/_b/_m0…/_c0…`; breakdown uses top-N CTEs with ranks, series cap 8 / heatmap 20; date grains via `CAST(date_trunc(g, col) AS DATE)`; KPI comparison shifts the active date-range condition; sources: table or saved single-SELECT query exposed as temp view `__cb_dashboard_source`), run through `QueryRunner.run_read` (cancellable by query id via `/api/sql/cancel/{id}`, max 4 concurrent reads), LRU result cache keyed by (SQL, params, table version tokens; for saved queries all table versions). `dashboard_routes.py` (`/api/dashboards…`, `/query`, `/options`, `/columns`, `/sample`, `/api/export/file` for PNG/PDF bytes). `demo.py` builds the sample table (CTAS through `SqlWriter`) and dashboard.
+  - Dashboards frontend: `routes/dashboards.tsx` (list), `routes/dashboard.tsx` (lazy; view/edit mode, draft spec, Save/Discard), `components/dashboard/*` (react-grid-layout v2 grid, `tile.tsx` frame, chart/kpi/table/text tiles, `filter-bar.tsx`, `filter-editor.tsx`, `tile-editor.tsx` right panel), `lib/dashboard*.ts` (types, pure logic, ECharts option builders, `ColorAssigner` = stable per-tile series colours, number formats `1.2K/3.4M`, export via html-to-image + jspdf), `hooks/use-dashboards.ts`. Palettes are rotations of the validated categorical palette (all rotations pass the dataviz validator in both modes); combo charts share **one** axis (no dual axis, per the dataviz rules).
   - `tables.py` — describe/sample/history/rename (directory move)/drop (move to `tmp/` then delete). `routes.py` — all `/api/*` endpoints.
 - `src/` — React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york, zinc, lucide), TanStack Query for server state.
   - `lib/backend.ts` — `BackendClient` (`get/post/put/delete`, token header, `ApiError` with FastAPI `detail`), `loadBackendInfo`, `waitForBackend`.

@@ -4,6 +4,8 @@ from pathlib import Path
 
 from chakybricks.catalog import Catalog
 from chakybricks.config import Settings, SettingsStore
+from chakybricks.dashboard_query import DashboardQueries
+from chakybricks.dashboards import DashboardStore
 from chakybricks.engine import Engine
 from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.ingest.jobs import ImportManager
@@ -40,6 +42,8 @@ class Services:
         self.kernels = KernelRegistry(self.workspace, lambda: self.settings, self.kernel_env)
         self.packages = PackageManager(self.kernel_env, before_reset=self.kernels.shutdown_all)
         self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings, SqlWriter(self))
+        self.dashboards = DashboardStore(self.catalog)
+        self.dashboard_queries = DashboardQueries(self.catalog, self.queries, self.sql)
 
     def update_settings(self, changes: dict[str, object]) -> Settings:
         with self._lock:

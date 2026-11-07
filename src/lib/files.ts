@@ -31,3 +31,17 @@ export async function pickSavePath(
   });
   return result ?? null;
 }
+
+/** Resolves to a path, null when cancelled, or undefined outside the desktop app. */
+export async function pickExportPath(
+  defaultName: string,
+  format: "png" | "pdf",
+): Promise<string | null | undefined> {
+  if (!isTauri()) return undefined;
+  const result = await save({
+    title: "Export dashboard",
+    defaultPath: defaultName,
+    filters: [{ name: format === "png" ? "PNG image" : "PDF document", extensions: [format] }],
+  });
+  return result ?? null;
+}
