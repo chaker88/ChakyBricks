@@ -9,8 +9,30 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 - Phase 1 (skeleton) — done, reviewed.
 - Phase 2 (data: storage, SQLite catalog, import wizard, catalog UI) — done, reviewed and hand-tested (incl. an 800 MB CSV, Arabic column names, TIMESTAMPTZ). Follow-up fixes: Unicode column names, Arrow-based serialization, pytz/tzdata.
 - Phase 3 (SQL editor, result grid, saved queries, history, export) — done, hand-tested and approved (decisions 2–5 approved). Decision 1 follow-up done: the editor supports Delta-backed write statements (see `statements.py` / `writes.py`).
-- Phase 4 (notebooks: kernels, cb helper, SQL cells, rich outputs, notebook UI) — implemented and committed; **awaiting the user's hand test and review** (the notebook UI has not been clicked through by Claude).
-- Next: Phase 5 (dashboards).
+- Phase 4 (notebooks: kernels, cb helper, SQL cells, rich outputs, notebook UI) — built and committed (`94675f5`); **not yet tested by hand** (the notebook UI has not been clicked through by Claude or the user).
+
+### Phase 4 decisions (made by the user, not implemented yet)
+
+- Approved as built: 2 (notebook tables show the first 1,000 rows + total), 4 (`cb.save` sanitizes column names and prints a note), 5 (an error aborts the rest of the queue, as in Jupyter), 7 (the custom table mime falls back to text/plain outside ChakyBricks).
+- (1) `%%sql` and SQL cells support the **same write statements as the SQL editor** (CREATE [OR REPLACE] TABLE … AS SELECT, INSERT INTO … SELECT, DROP TABLE, ALTER TABLE … RENAME TO; same rejections). Today `cb.sql`/`%%sql` are read-only. Reuse `statements.parse_write`; in the kernel there is no `ImportManager`/`Services`, so implement a kernel-side writer (e.g. CTAS/INSERT via the `cb.save` path with positional mapping, DROP/RENAME via catalog + workspace) or call a backend endpoint — decide when implementing; show the same success messages; the SQL editor/catalog UI must see the changes.
+- (3) Kernels get **50% of the app memory limit by default**, configurable (new setting, e.g. `kernel_memory_limit_mb` or a percentage, shown in Settings). Today each kernel gets the full app limit.
+- (6) A **running-kernels indicator**: list of running kernels with notebook name, status and memory use (process RSS), with a Shut down action (e.g. title bar / notebooks list). Today kernels run until the notebook is deleted or the app exits.
+
+### Planned architecture change before Phase 5 (decided by the user, not implemented yet)
+
+Replace the frozen `--kernel` launch with a **bundled standalone Python 3.12 runtime with pip** for notebook kernels:
+
+- Ship a standalone CPython 3.12 (with pip) inside the installer, used only for kernels.
+- A **per-workspace virtual environment** (e.g. `workspace/.venv`) created from that runtime on first use, with the bundled packages (pandas, polars, numpy, pyarrow, duckdb, deltalake, matplotlib, plotly, scikit-learn, scipy, ipykernel, plus the `chakybricks` helper package needed by `cb`/`kernel_init`) installed into it.
+- Kernels run from that venv; support `%pip install …` and `!` shell commands in cells.
+- A **Settings → Packages** page: list installed packages, install/upgrade/uninstall, show output.
+- This supersedes SPEC.md's "kernels are launched by re-invoking [the backend exe] with `--kernel`" and "users cannot pip install into the frozen app in v1" — approved by the user; update SPEC.md (or note the deviation) when implementing. `kernel_argv()` in `kernels.py` and the packaging checklist below change accordingly; the backend (FastAPI) can stay a PyInstaller exe.
+
+### Next
+
+1. User hand-tests Phase 4 (checklist below); fix what they find.
+2. Implement the Phase 4 decisions (1), (3), (6) and the bundled-runtime change above.
+3. Phase 5 (dashboards).
 
 ### Phase 4 — still to test by hand
 
