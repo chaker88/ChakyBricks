@@ -19,7 +19,7 @@ class QueryError(ChakyError):
 
 
 class QueryCancelledError(ChakyError):
-    status_code = 409
+    status_code = 499
 
     def __init__(self) -> None:
         super().__init__("Query cancelled")

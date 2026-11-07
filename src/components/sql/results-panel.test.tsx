@@ -8,6 +8,8 @@ import type { QueryResult } from "@/lib/api-types";
 
 const result: QueryResult = {
   query_id: "q1",
+  kind: "rows",
+  writes: [],
   columns: [
     { name: "الاسم", type: "VARCHAR" },
     { name: "amount", type: "DOUBLE" },
@@ -76,5 +78,40 @@ describe("results", () => {
   it("offers cancel while running", () => {
     render(wrap(<ResultsPanel run={run({ status: "running" })} onCancel={() => {}} />));
     expect(screen.getByRole("button", { name: /Cancel/ })).toBeInTheDocument();
+  });
+
+  it("shows a success message instead of a grid for writes", () => {
+    const write: QueryResult = {
+      ...result,
+      kind: "write",
+      message: "Created main.north with 2 rows · version 0",
+      columns: [],
+      rows: [],
+      row_count: 2,
+      truncated: false,
+      statement_count: 2,
+      writes: [
+        {
+          action: "drop",
+          table: "main.north",
+          message: "Dropped main.north",
+          rows_written: null,
+          version: null,
+        },
+        {
+          action: "create",
+          table: "main.north",
+          message: "Created main.north with 2 rows · version 0",
+          rows_written: 2,
+          version: 0,
+        },
+      ],
+    };
+    render(wrap(<ResultsPanel run={run({ result: write })} onCancel={() => {}} />));
+    expect(screen.getByText("Created main.north with 2 rows · version 0")).toBeInTheDocument();
+    expect(screen.getByText("Dropped main.north")).toBeInTheDocument();
+    expect(screen.getByText(/2 statements/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Export/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 });

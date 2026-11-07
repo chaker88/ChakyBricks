@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from chakybricks import delta
 from chakybricks.catalog import Catalog, normalize_identifier, normalize_schema
-from chakybricks.engine import Engine
+from chakybricks.engine import Engine, quote_ident
 from chakybricks.errors import ConflictError, InvalidInputError, NotFoundError
 from chakybricks.ingest.sources import (
     ColumnSpec,
@@ -25,9 +25,10 @@ from chakybricks.ingest.sources import (
     SourceOptions,
     apply_columns,
     estimate_rows,
-    inferred_columns,
     open_source,
     resolve_source,
+    sanitize_column_names,
+    storage_type,
 )
 from chakybricks.statements import result_query
 from chakybricks.workspace import Workspace
@@ -69,6 +70,7 @@ class QueryImportRequest(BaseModel):
     table: str
     partition_by: str | None = None
     mode: ImportMode = ImportMode.CREATE
+    target_columns: list[ColumnSpec] | None = None
 
 
 class ImportCancelled(Exception):
@@ -270,7 +272,7 @@ class ImportManager:
                 rel = con.sql(request.sql)
             except duckdb.Error as exc:
                 raise InvalidInputError(str(exc)) from exc
-            return apply_columns(rel, inferred_columns(rel)), None
+            return _project_query(rel, request), None
         source = resolve_source(request.path)
         raw = open_source(con, source, request.format, request.options)
         return apply_columns(raw, request.columns), estimate_rows(source, request.format, raw)
@@ -284,6 +286,31 @@ class ImportManager:
         finished = [j.id for j in self._jobs.values() if j.done]
         for job_id in finished[: max(0, len(finished) - MAX_FINISHED_JOBS)]:
             del self._jobs[job_id]
+
+
+def _project_query(
+    rel: duckdb.DuckDBPyRelation, request: QueryImportRequest
+) -> duckdb.DuckDBPyRelation:
+    """Maps query output to table columns by position, so duplicate output names are fine."""
+    raw_types = [str(t) for t in rel.types]
+    if request.target_columns is None:
+        names = sanitize_column_names(rel.columns)
+        types = [storage_type(t) for t in raw_types]
+    else:
+        target = request.target_columns
+        if len(target) != len(raw_types):
+            raise InvalidInputError(
+                f"The query returns {len(raw_types)} columns but "
+                f"{request.schema_name}.{request.table} has {len(target)}: "
+                + ", ".join(c.name for c in target)
+            )
+        names = [c.name for c in target]
+        types = [c.type for c in target]
+    expressions = []
+    for index, (name, target_type, raw) in enumerate(zip(names, types, raw_types, strict=True), 1):
+        value = f"#{index}" if target_type == raw else f"CAST(#{index} AS {target_type})"
+        expressions.append(f"{value} AS {quote_ident(name)}")
+    return rel.project(", ".join(expressions))
 
 
 def _error_message(exc: BaseException) -> str:

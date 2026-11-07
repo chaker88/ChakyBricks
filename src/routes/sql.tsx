@@ -204,7 +204,9 @@ export default function SqlPage() {
                   </Button>
                 )}
                 <div className="flex-1" />
-                <span className="text-[11px] text-muted-foreground">Read-only · DuckDB SQL</span>
+                <span className="text-[11px] text-muted-foreground">
+                  DuckDB SQL · tables are Delta
+                </span>
                 <Button
                   size="sm"
                   variant="outline"

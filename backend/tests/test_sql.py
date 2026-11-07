@@ -88,20 +88,28 @@ def test_multiple_statements_return_the_last(sales: Services) -> None:
 
 
 @pytest.mark.parametrize(
-    "sql",
+    ("sql", "message"),
     [
-        "CREATE TABLE x AS SELECT 1",
-        "INSERT INTO sales VALUES (1, 'x', 1)",
-        "SET threads = 1",
-        "COPY (SELECT 1) TO 'x.csv'",
-        "PRAGMA show_tables",
-        "SELECT 1; DROP VIEW sales",
-        "ATTACH 'x.db'",
+        ("SET threads = 1", "SET statements are not supported"),
+        ("COPY (SELECT 1) TO 'x.csv'", "COPY statements are not supported"),
+        ("ATTACH 'x.db'", "ATTACH statements are not supported"),
+        ("UPDATE sales SET amount = 1", "UPDATE statements are not supported"),
+        ("DELETE FROM sales", "DELETE statements are not supported"),
+        ("TRUNCATE sales", "DELETE statements are not supported"),
+        ("PRAGMA show_tables", "PRAGMA statements are not supported"),
+        ("SELECT 1; DROP VIEW sales", "DROP VIEW statements are not supported"),
+        ("CREATE TABLE x (a INTEGER)", "CREATE TABLE needs a query"),
+        ("CREATE TEMP TABLE x AS SELECT 1", "CREATE TABLE needs a query"),
+        ("CREATE VIEW v AS SELECT 1", "CREATE VIEW statements are not supported"),
+        ("CREATE SCHEMA s", "CREATE SCHEMA statements are not supported"),
+        ("INSERT INTO sales (id) SELECT 1", "column lists are not supported"),
+        ("ALTER TABLE sales ADD COLUMN x INTEGER", "ALTER TABLE statements are not supported"),
     ],
 )
-def test_write_statements_are_rejected(sales: Services, sql: str) -> None:
-    with pytest.raises(InvalidInputError, match="read-only"):
+def test_unsupported_statements_are_rejected(sales: Services, sql: str, message: str) -> None:
+    with pytest.raises(InvalidInputError, match=message):
         run(sales, sql)
+    assert sales.catalog.get_table("main", "sales").version == 0
 
 
 def test_read_only_helpers_are_allowed(sales: Services) -> None:

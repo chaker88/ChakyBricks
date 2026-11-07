@@ -100,8 +100,19 @@ export interface AppSettings {
   row_limit: number;
 }
 
+export interface WriteOutcome {
+  action: "create" | "replace" | "append" | "drop" | "rename" | "skipped";
+  table: string;
+  message: string;
+  rows_written: number | null;
+  version: number | null;
+}
+
 export interface QueryResult extends RowSet {
   query_id: string;
+  kind: "rows" | "write";
+  message?: string;
+  writes: WriteOutcome[];
   row_count: number;
   truncated: boolean;
   elapsed_ms: number;

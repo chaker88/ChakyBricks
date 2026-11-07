@@ -9,6 +9,7 @@ from chakybricks.ingest.jobs import ImportManager
 from chakybricks.queries import QueryStore
 from chakybricks.sql import QueryRunner
 from chakybricks.workspace import Workspace
+from chakybricks.writes import SqlWriter
 
 
 class Services:
@@ -24,7 +25,7 @@ class Services:
         self.engine = Engine(self.catalog, self.workspace, self.settings)
         self.imports = ImportManager(self.workspace, self.catalog, self.engine)
         self.queries = QueryStore(self.catalog)
-        self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings)
+        self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings, SqlWriter(self))
 
     def update_settings(self, changes: dict[str, object]) -> Settings:
         with self._lock:

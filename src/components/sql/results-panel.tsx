@@ -1,4 +1,14 @@
-import { BarChart3, Ban, Database, Download, Loader2, OctagonX, Play, Table2 } from "lucide-react";
+import {
+  BarChart3,
+  Ban,
+  CheckCircle2,
+  Database,
+  Download,
+  Loader2,
+  OctagonX,
+  Play,
+  Table2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResultGrid } from "@/components/result-grid";
@@ -23,6 +33,7 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
   const [saving, setSaving] = useState(false);
   const exporter = useExportResult();
   const result = run?.result;
+  const rowsResult = result?.kind === "rows" ? result : undefined;
   const running = run?.status === "running";
 
   const exportResult = async (format: "csv" | "parquet") => {
@@ -52,7 +63,7 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
       <div className="flex h-10 shrink-0 items-center gap-3 border-b px-3 text-xs">
         <Status run={run} />
         <div className="flex-1" />
-        {result && (
+        {rowsResult && (
           <>
             <div className="flex gap-0.5 rounded-md bg-muted p-0.5">
               {(
@@ -85,7 +96,7 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  Full result ({formatNumber(result.row_count)} rows)
+                  Full result ({formatNumber(rowsResult.row_count)} rows)
                 </DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => exportResult("csv")}>CSV</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => exportResult("parquet")}>
@@ -132,18 +143,34 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
             <Ban className="size-5" />
             Query cancelled
           </Placeholder>
-        ) : result ? (
+        ) : result?.kind === "write" ? (
+          <div className={cn("h-full overflow-auto p-4", running && "opacity-50")}>
+            <div className="flex gap-2.5 rounded-lg border bg-card p-4">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium select-text">{result.message}</p>
+                {result.writes.length > 1 && (
+                  <ul className="space-y-0.5 text-xs text-muted-foreground select-text">
+                    {result.writes.slice(0, -1).map((write, i) => (
+                      <li key={i}>{write.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : rowsResult ? (
           <div className={cn("h-full", running && "opacity-50")}>
             {view === "table" ? (
               <ResultGrid
-                data={result}
+                data={rowsResult}
                 className="h-full"
                 renderColumnPopover={(index) => (
-                  <ColumnStatsPanel sql={run.sql} column={result.columns[index].name} />
+                  <ColumnStatsPanel sql={run.sql} column={rowsResult.columns[index].name} />
                 )}
               />
             ) : (
-              <ResultChart key={result.query_id} data={result} />
+              <ResultChart key={rowsResult.query_id} data={rowsResult} />
             )}
           </div>
         ) : (
@@ -153,9 +180,9 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
           </Placeholder>
         )}
       </div>
-      {result && (
+      {rowsResult && (
         <SaveTableDialog
-          key={result.query_id}
+          key={rowsResult.query_id}
           sql={run.sql}
           open={saving}
           onOpenChange={setSaving}
@@ -183,6 +210,14 @@ function Status({ run }: { run: RunState }) {
   }
   const result = run.result;
   if (run.status !== "done" || !result) return null;
+  if (result.kind === "write") {
+    return (
+      <span className="text-muted-foreground tabular-nums">
+        {result.statement_count > 1 ? `${result.statement_count} statements` : "Done"} ·{" "}
+        {formatDuration(result.elapsed_ms / 1000)}
+      </span>
+    );
+  }
   return (
     <span className="text-muted-foreground tabular-nums">
       {result.truncated ? (

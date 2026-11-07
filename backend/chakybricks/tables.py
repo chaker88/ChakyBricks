@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import shutil
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import duckdb
 
@@ -9,7 +11,9 @@ from chakybricks.catalog import TableInfo, normalize_identifier, normalize_schem
 from chakybricks.engine import quote_ident
 from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.serialization import relation_to_json
-from chakybricks.services import Services
+
+if TYPE_CHECKING:
+    from chakybricks.services import Services
 
 MAX_SAMPLE_ROWS = 1000
 

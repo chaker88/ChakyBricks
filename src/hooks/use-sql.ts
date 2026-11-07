@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { useClient } from "@/hooks/use-api";
+import { queryKeys, useClient } from "@/hooks/use-api";
 import type {
   ColumnStats,
   ExportResult,
@@ -20,6 +20,8 @@ function requireClient(client: BackendClient | null): BackendClient {
   if (!client) throw new Error("Engine is not running");
   return client;
 }
+
+export const CANCELLED_STATUS = 499;
 
 export interface RunState {
   status: "running" | "done" | "error" | "cancelled";
@@ -53,8 +55,13 @@ export function useQueryRunner() {
       try {
         const result = await client.post<QueryResult>("/api/sql/run", { sql, query_id: queryId });
         settle({ status: "done", result });
+        if (result.writes.length > 0) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
+          queryClient.invalidateQueries({ queryKey: ["table"] });
+        }
       } catch (error) {
-        if (error instanceof ApiError && error.status === 409) settle({ status: "cancelled" });
+        if (error instanceof ApiError && error.status === CANCELLED_STATUS)
+          settle({ status: "cancelled" });
         else
           settle({
             status: "error",

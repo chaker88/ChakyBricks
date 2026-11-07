@@ -8,37 +8,8 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 - Phase 1 (skeleton) — done, reviewed.
 - Phase 2 (data: storage, SQLite catalog, import wizard, catalog UI) — done, reviewed and hand-tested (incl. an 800 MB CSV, Arabic column names, TIMESTAMPTZ). Follow-up fixes: Unicode column names, Arrow-based serialization, pytz/tzdata.
-- Phase 3 (SQL editor, result grid, saved queries, history, export) — implemented and committed; **awaiting the user's hand test and review**. Automated checks pass; the editor UI has not been clicked through by Claude.
-
-### Phase 3 — still to test by hand
-
-- Editor: multiple tabs (new/close/middle-click close, persist across restart), Monaco loads offline, light/dark theme follows the app.
-- Autocomplete: tables, `schema.` → tables, `alias.` / `table.` → columns (incl. Arabic names), keywords, functions.
-- Shortcuts: Ctrl+Enter (selection or all), Ctrl+Shift+Enter (run all), Ctrl+S (save / update saved query), dirty dot on modified saved tabs.
-- Results: row-limit truncation message with exact total, grid scrolling with 100k+ rows (set row limit to 100,000+), column resize / double-click reset, column stats popover (numeric, text, date).
-- Cancel a long query (e.g. `SELECT count(*) FROM range(100000000000) t(i) WHERE i % 7 = 1`).
-- Quick chart: bar/line/area/scatter/donut, series toggles, dark mode colors.
-- Export full result to CSV and Parquet via the native save dialog (large result).
-- Save as table (new, replace, append) → toast, appears in catalog, queryable.
-- Sidebar: schema browser insert + ▶ preview, saved queries open/rename/delete, history reopen/clear.
-- Entry points: table page "Open in SQL", Home "New query", Ctrl+K "New query"; Settings row limit.
-- Errors: syntax error, unknown table, rejected write statement message.
-
-### Pending change (approved direction for decision 1, not implemented yet)
-
-Phase 3 currently makes the SQL editor read-only (SELECT/EXPLAIN only). Change it to also support these statements, routed through the same Delta + catalog path as "Save as table" (`ImportManager` with a query source, sanitized column names, catalog upsert), never through DuckDB's in-memory tables:
-
-- `CREATE TABLE [schema.]t AS SELECT …` → create (error if it exists)
-- `CREATE OR REPLACE TABLE [schema.]t AS SELECT …` → overwrite
-- `INSERT INTO [schema.]t SELECT …` → append
-- `DROP TABLE [IF EXISTS] [schema.]t` → `tables.drop`
-- `ALTER TABLE [schema.]t RENAME TO new_name` → `tables.rename`
-
-Keep rejecting `SET`, `COPY`, `ATTACH`, `UPDATE`, `DELETE` (and other writes) with a clear message. Results should report affected table / rows; refresh the catalog in the UI afterwards; record in history. Add tests for each statement and for the rejected ones.
-
-### Next
-
-After the user approves Phase 3 and the pending change is done: Phase 4 (notebooks). The table page navigates to `/notebooks?table=schema.table`; Phase 4 should read that param (the SQL page handles `/sql?table=` and `/sql?new=1`).
+- Phase 3 (SQL editor, result grid, saved queries, history, export) — done, hand-tested and approved (decisions 2–5 approved). Decision 1 follow-up done: the editor supports Delta-backed write statements (see `statements.py` / `writes.py`).
+- Phase 4 (notebooks) — in progress.
 
 ## Commands (run from repo root, PowerShell)
 
@@ -73,10 +44,11 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - `ingest/sources.py` — format detection, DuckDB readers (`read_csv/read_parquet/read_json`; Excel via pandas+openpyxl, ≤50 MB), column-name sanitizing — every name must work unquoted in SQL and Python: NFKC + lowercase; anything but Unicode letters, combining marks, decimal digits and `_` → `_`; repeated `_` collapsed and trimmed; empty → `column_N`; `c_` prefix if it starts with a non-letter or is a DuckDB-reserved/Python keyword; de-duplicated. `column_name_error` validates user-typed names; frontend mirror (characters only) in `lib/import.ts`. Arabic/accented names must survive, type overrides (whitelisted cast types), Delta-safe type mapping (`storage_type`: unsigned → wider signed/decimal, TIME/UUID/INTERVAL → VARCHAR…), row estimates, preview.
   - `ingest/jobs.py` — `ImportManager`: single background worker thread (imports never run concurrently). Streams `relation.to_arrow_reader()` → generator (counts rows, checks cancel) → `write_deltalake`. Cancel = event + `con.interrupt()`; failures of new tables remove the folder. Exceptions raised inside the stream abort the Delta commit (verified).
   - `serialization.py` — `relation_to_json` goes through Arrow (`to_arrow_table`) and formats every type itself: timestamps as ISO (tz-aware → UTC with `Z`, ns precision kept), TIME/INTERVAL as text, DECIMAL as a number only when exact, ints beyond 2^53 as strings, BLOB as escaped hex text, LIST/STRUCT/MAP recursively. Never use DuckDB `fetchall()` for user data (TIMESTAMPTZ needs pytz) or pyarrow `to_pylist()` on tz-aware/ns arrays (needs zoneinfo/pandas).
-  - `statements.py` — `parse_statements` (DuckDB `extract_statements`; editor is read-only: only SELECT/EXPLAIN — DESCRIBE/SUMMARIZE/FROM-first count as SELECT) and `result_query` (last statement, must be SELECT; used by export, stats, save-as-table).
-  - `sql.py` — `QueryRunner`: `run` returns the first `row_limit` rows + exact total (streams Arrow batches until limit+1; only if there are more rows does it run `rel.aggregate("count(*)")`), records history; `cancel` by query id (interrupts repeatedly until the query leaves the running set — a single interrupt sent before DuckDB starts executing is lost); `export` streams `rel.write_csv/write_parquet` on a bulk connection; `column_stats` (count, nulls, approx distinct, min/max, mean/stddev/quartiles for numerics, top 10 values). Uses relation APIs, never wraps SQL text. `python_enable_replacements=false` on every connection so Python variables can't be queried.
+  - `statements.py` — `parse_statements` (DuckDB `extract_statements`) returns `Statement`s: SELECT/EXPLAIN run in DuckDB (DESCRIBE/SUMMARIZE/FROM-first count as SELECT); CREATE/INSERT/DROP/ALTER are parsed by `parse_write` into a `WriteStatement` for the supported forms only — `CREATE [OR REPLACE] TABLE [IF NOT EXISTS] t AS SELECT`, `INSERT INTO t SELECT|VALUES` (no column list), `DROP TABLE [IF EXISTS] t`, `ALTER TABLE [IF EXISTS] t RENAME TO u`; everything else (SET, COPY, ATTACH, UPDATE, DELETE/TRUNCATE, PRAGMA, views, schemas, temp tables, plain CREATE TABLE) is rejected with a message listing the supported writes. `result_query` = last statement, must be SELECT (export, stats, save-as-table).
+  - `writes.py` — `SqlWriter`: executes `WriteStatement`s through Delta + catalog, never DuckDB tables. CTAS/INSERT submit a `QueryImportRequest` to `ImportManager` and wait (cancel propagates to the job); INSERT maps columns **by position** and casts to the target's types (`target_columns`); CTAS sanitizes names; DROP/RENAME reuse `tables.drop/rename`. Returns `{action, table, message, rows_written, version}`.
+  - `sql.py` — `QueryRunner`: `run` executes statements in order (each read on a fresh `engine.cursor()`, so tables created earlier in the same run are visible; writes via `SqlWriter`); returns `kind: "rows"` (first `row_limit` rows + exact total: streams Arrow batches until limit+1, then `rel.aggregate("count(*)")` only if needed) or `kind: "write"` with `message`, plus `writes: [...]` for every run; records history. Each run has a `_Run` handle (current connection / job id / cancelled flag); `cancel` interrupts repeatedly until the run ends (a single interrupt sent before DuckDB starts executing is lost) and cancels the import job. Cancelled = HTTP **499** (409 is a real conflict). `export` streams `rel.write_csv/write_parquet` on a bulk connection; `column_stats`. Uses relation APIs and positional `#n` projections, never wraps SQL text. `python_enable_replacements=false` on every connection.
   - `queries.py` — `QueryStore`: saved queries (unique, case-insensitive names) and query history (last 500) in meta.db (migration 2).
-  - Save-as-table reuses `ImportManager` with a `QueryImportRequest` (bulk connection with catalog views, sanitized column names).
+  - Save-as-table reuses `ImportManager` with a `QueryImportRequest` (bulk connection with catalog views, positional projection, sanitized column names).
   - `sql_routes.py` — `/api/sql/{run,cancel,stats,export,save-table,history}`, `/api/saved-queries`.
   - `tables.py` — describe/sample/history/rename (directory move)/drop (move to `tmp/` then delete). `routes.py` — all `/api/*` endpoints.
 - `src/` — React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york, zinc, lucide), TanStack Query for server state.
@@ -85,7 +57,7 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
   - `components/import/` — `ImportProvider` (`useImport().openImport()` from anywhere; watches running jobs, toasts when the dialog is closed), `ImportWizard` (pick → configure → progress), `ConfigureStep` (destination, partition, CSV options, editable columns, live preview). Pure logic in `lib/import.ts`.
   - `routes/catalog.tsx` (layout with `components/catalog/catalog-tree.tsx`), `routes/table-page.tsx` (schema / sample / history with time-travel sample / details; rename, drop).
   - `components/data-preview.tsx` — simple table for small previews; `components/result-grid.tsx` — virtualized grid (TanStack Table v9 `useTable` + `tableFeatures({columnSizingFeature, columnResizingFeature})`, TanStack Virtual rows, resizable columns, header popover).
-  - SQL page `routes/sql.tsx` (lazy-loaded: Monaco + ECharts live in that chunk). Tabs reducer + localStorage in `lib/sql-tabs.ts`; Monaco setup in `lib/monaco.ts` (local worker via `monaco-editor/editor/editor.worker?worker`, `chaky-light/dark` themes, one global SQL completion provider fed by `setCompletionTables`; one model per tab — Monaco owns the text after the model exists, React state only seeds it). Autocomplete logic in `lib/sql-completion.ts`. Per-tab runs in `hooks/use-sql.ts` (`useQueryRunner`). Results panel: status/counts, Table/Chart, export full result (native save dialog), save as table, column stats on header click.
+  - SQL page `routes/sql.tsx` (lazy-loaded: Monaco + ECharts live in that chunk). Tabs reducer + localStorage in `lib/sql-tabs.ts`; Monaco setup in `lib/monaco.ts` (local worker via `monaco-editor/editor/editor.worker?worker`, `chaky-light/dark` themes, one global SQL completion provider fed by `setCompletionTables`; one model per tab — Monaco owns the text after the model exists, React state only seeds it). Autocomplete logic in `lib/sql-completion.ts`. Per-tab runs in `hooks/use-sql.ts` (`useQueryRunner`; invalidates catalog and table queries when a run returns `writes`). Results panel (write results show a success message instead of the grid): status/counts, Table/Chart, export full result (native save dialog), save as table, column stats on header click.
   - Charts: `lib/chart.ts` (validated categorical palette from the dataviz skill, light/dark; one axis; ≤8 series, ≤3 for scatter; pie folds >8 slices into Other) + `components/sql/result-chart.tsx` (tree-shaken `echarts/core`).
   - Theme, nav rail, command palette (Ctrl+K: navigation, import, tables), Ctrl+1..7 shortcuts as in Phase 1.
 
