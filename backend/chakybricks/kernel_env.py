@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,9 @@ from chakybricks.errors import ChakyError
 VENV_ENV = "CHAKYBRICKS_KERNEL_VENV"
 BASE_PYTHON_ENV = "CHAKYBRICKS_BASE_PYTHON"
 PTH_NAME = "_chakybricks_defaults.pth"
+CONSTRAINTS_NAME = "chakybricks-constraints.txt"
+PROTECTED_PACKAGES = ("duckdb", "deltalake", "pyarrow", "polars", "numpy", "pandas", "ipykernel")
+_CONSTRAINT_CONFLICT = re.compile(r"The user requested \(constraint\) ([A-Za-z0-9_.-]+)==(\S+)")
 MARKER = "chakybricks-env.json"
 CREATE_NO_WINDOW = 0x08000000
 
@@ -94,9 +98,14 @@ class KernelEnvironment:
         version = f"python{sys.version_info.major}.{sys.version_info.minor}"
         return self.path / "lib" / version / "site-packages"
 
+    @property
+    def constraints(self) -> Path:
+        return self.path / CONSTRAINTS_NAME
+
     def environment(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         env = clean_environment(extra)
         env["VIRTUAL_ENV"] = str(self.path)
+        env["PIP_CONSTRAINT"] = str(self.constraints)
         env["PATH"] = os.pathsep.join([str(self.scripts), env.get("PATH", "")])
         return env
 
@@ -116,12 +125,31 @@ class KernelEnvironment:
         with self._lock:
             if not self.ready():
                 self._create()
+            self._write_pip_config()
         return self
 
     def reset(self) -> None:
         with self._lock:
             self._remove()
             self._create()
+            self._write_pip_config()
+
+    def protected(self) -> dict[str, str]:
+        """The bundled versions every install in the venv must keep (cb depends on them)."""
+        versions = {p.name.lower(): p.version for p in self.defaults()}
+        return {name: versions[name] for name in PROTECTED_PACKAGES if name in versions}
+
+    def _write_pip_config(self) -> None:
+        """Pin cb's dependencies for every pip run in the venv: %pip, !pip and the Packages page."""
+        lines = [f"{name}=={version}" for name, version in self.protected().items()]
+        self.constraints.write_text(
+            "# Managed by ChakyBricks: cb, SQL cells and Delta tables need these versions.\n"
+            + "\n".join(lines)
+            + "\n",
+            encoding="utf-8",
+        )
+        config = self.path / ("pip.ini" if sys.platform == "win32" else "pip.conf")
+        config.write_text(f"[install]\nconstraint = {self.constraints}\n", encoding="utf-8")
 
     def defaults(self) -> list[Package]:
         return _distributions(defaults_path())
@@ -179,6 +207,22 @@ class KernelEnvironment:
                         f"Could not remove {self.path}; shut down running kernels and try again"
                     ) from None
                 time.sleep(0.3)
+
+
+def explain_conflict(pip_output: str) -> str | None:
+    """A readable reason when pip refused an install because it would change a pinned package."""
+    pinned: dict[str, str] = {}
+    for name, version in _CONSTRAINT_CONFLICT.findall(pip_output):
+        pinned.setdefault(name.lower(), version)
+    if not pinned:
+        return None
+    listed = ", ".join(f"{name} {version}" for name, version in pinned.items())
+    names = ", ".join(PROTECTED_PACKAGES)
+    return (
+        f"Nothing was installed: this would change {listed}. ChakyBricks keeps {names} at the "
+        "bundled versions because cb, SQL cells and Delta tables depend on them. Try a version "
+        "of the package that supports the bundled versions (often an older or newer release)."
+    )
 
 
 def _python_tag() -> str:

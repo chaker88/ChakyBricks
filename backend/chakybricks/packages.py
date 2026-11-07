@@ -11,7 +11,7 @@ from enum import StrEnum
 from typing import Any
 
 from chakybricks.errors import ConflictError, InvalidInputError, NotFoundError
-from chakybricks.kernel_env import KernelEnvironment, subprocess_flags
+from chakybricks.kernel_env import KernelEnvironment, explain_conflict, subprocess_flags
 
 MAX_JOBS = 30
 MAX_OUTPUT_CHARS = 200_000
@@ -103,6 +103,7 @@ class PackageManager:
         overridden = {p.name.lower() for p in installed}
         return {
             "environment": self.environment.info(),
+            "protected": self.environment.protected(),
             "installed": [p.to_dict() for p in installed],
             "defaults": [
                 {**p.to_dict(), "overridden": p.name.lower() in overridden}
@@ -197,4 +198,7 @@ class PackageManager:
         for line in process.stdout:
             job.append(line)
         if process.wait() != 0:
-            raise RuntimeError(f"pip exited with code {process.returncode}")
+            explanation = explain_conflict(job.output)
+            if explanation:
+                job.append(f"\n{explanation}\n")
+            raise RuntimeError(explanation or f"pip exited with code {process.returncode}")

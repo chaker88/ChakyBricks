@@ -6,12 +6,20 @@ import {
   Clock,
   Loader2,
   Play,
+  Plus,
   Trash2,
   XCircle,
 } from "lucide-react";
 import { forwardRef, memo } from "react";
 import { CellEditor, type CellEditorHandle, type RunMode } from "@/components/notebook/cell-editor";
 import { CellOutputs } from "@/components/notebook/cell-outputs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -22,7 +30,7 @@ import {
 import { formatDuration } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import type { KernelCompletion } from "@/lib/monaco";
-import type { Cell, CellType, NotebookAction } from "@/lib/notebook";
+import { ADD_LABELS, type Cell, type CellType, type NotebookAction } from "@/lib/notebook";
 import { cn } from "@/lib/utils";
 
 const TYPES: { value: CellType; label: string }[] = [
@@ -40,12 +48,13 @@ interface NotebookCellProps {
   dispatch: (action: NotebookAction) => void;
   onRun: (cell: Cell, mode: RunMode) => void;
   onActivate: (id: string) => void;
+  onAdd: (index: number, type: CellType) => void;
   complete: (code: string, offset: number) => Promise<KernelCompletion>;
 }
 
 export const NotebookCell = memo(
   forwardRef<CellEditorHandle, NotebookCellProps>(function NotebookCell(
-    { cell, index, count, active, autoFocus, dispatch, onRun, onActivate, complete },
+    { cell, index, count, active, autoFocus, dispatch, onRun, onActivate, onAdd, complete },
     ref,
   ) {
     const markdown = cell.type === "markdown";
@@ -108,6 +117,37 @@ export const NotebookCell = memo(
                 active && "opacity-100",
               )}
             >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    aria-label="Add cell"
+                    title="Add cell"
+                    className="flex items-center gap-0.5 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    <Plus className="size-3.5" />
+                    <span className="text-[11px]">Add cell</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {ADD_LABELS.map((t) => (
+                    <DropdownMenuItem
+                      key={`below-${t.value}`}
+                      onSelect={() => onAdd(index + 1, t.value)}
+                    >
+                      {t.label} cell below
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  {ADD_LABELS.map((t) => (
+                    <DropdownMenuItem
+                      key={`above-${t.value}`}
+                      onSelect={() => onAdd(index, t.value)}
+                    >
+                      {t.label} cell above
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <IconButton
                 label="Move up"
                 disabled={index === 0}
@@ -216,24 +256,5 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-export function InsertBar({ onInsert }: { onInsert: (type: CellType) => void }) {
-  return (
-    <div className="group/insert relative flex h-5 items-center justify-center">
-      <div className="absolute inset-x-8 top-1/2 h-px bg-border opacity-0 transition-opacity group-hover/insert:opacity-100" />
-      <div className="relative flex gap-1 opacity-0 transition-opacity group-hover/insert:opacity-100">
-        {TYPES.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => onInsert(t.value)}
-            className="rounded-md border bg-background px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground"
-          >
-            + {t.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

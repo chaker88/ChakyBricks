@@ -189,6 +189,7 @@ export interface PackageListing {
   };
   installed: PackageInfo[];
   defaults: PackageInfo[];
+  protected: Record<string, string>;
 }
 
 export interface PackageJob {

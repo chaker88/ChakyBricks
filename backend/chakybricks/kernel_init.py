@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import shlex
+import subprocess
+import sys
 from typing import Any
 
 import duckdb
@@ -11,6 +15,7 @@ import pyarrow as pa
 
 from chakybricks import cb
 from chakybricks.errors import ChakyError
+from chakybricks.kernel_env import explain_conflict
 from chakybricks.serialization import relation_to_json
 
 TABLE_MIME = "application/vnd.chakybricks.table+json"
@@ -67,6 +72,31 @@ def sql_magic(line: str, cell: str) -> pl.DataFrame | None:
     return result
 
 
+def pip_magic(line: str) -> None:
+    """%pip that streams pip's output and explains refusals caused by the protected versions."""
+    args = shlex.split(line, posix=os.name != "nt")
+    process = subprocess.Popen(
+        [sys.executable, "-m", "pip", *args],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert process.stdout is not None
+    output: list[str] = []
+    for chunk in process.stdout:
+        output.append(chunk)
+        print(chunk, end="", flush=True)
+    if process.wait() != 0:
+        explanation = explain_conflict("".join(output))
+        if explanation:
+            print(f"\n\x1b[31m{explanation}\x1b[0m", file=sys.stderr)
+    elif args and args[0] in ("install", "uninstall"):
+        print("Note: restart the kernel if you changed a package that was already imported.")
+
+
 def setup() -> None:
     from IPython import get_ipython
 
@@ -78,3 +108,4 @@ def setup() -> None:
     for kind in (pl.DataFrame, pl.Series, pd.DataFrame, pd.Series, pa.Table):
         formatter.for_type(kind, _bundle)
     shell.register_magic_function(sql_magic, magic_kind="cell", magic_name="sql")
+    shell.register_magic_function(pip_magic, magic_kind="line", magic_name="pip")

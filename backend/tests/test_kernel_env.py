@@ -6,7 +6,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chakybricks.errors import ConflictError, InvalidInputError, NotFoundError
-from chakybricks.kernel_env import MARKER, PTH_NAME, KernelEnvironment
+from chakybricks.kernel_env import (
+    MARKER,
+    PROTECTED_PACKAGES,
+    PTH_NAME,
+    KernelEnvironment,
+    explain_conflict,
+)
 from chakybricks.packages import JobState, PackageManager, parse_requirements
 from tests.wheels import build_wheel
 
@@ -110,6 +116,7 @@ def test_package_api(client: TestClient) -> None:
     listing = client.get("/api/packages").json()
     assert listing["environment"]["python_version"].startswith("3.12")
     assert any(p["name"].lower() == "polars" for p in listing["defaults"])
+    assert set(listing["protected"]) == set(PROTECTED_PACKAGES)
     assert client.post("/api/packages/install", json={"packages": "--evil"}).status_code == 422
     assert client.post("/api/packages/duckdb/uninstall").status_code == 409
     assert client.get("/api/packages/jobs/nope").status_code == 404
@@ -120,3 +127,75 @@ def test_package_api(client: TestClient) -> None:
     updated = client.put("/api/settings", json={"kernel_memory_percent": 25}).json()
     assert updated["kernel_memory_percent"] == 25
     assert client.put("/api/settings", json={"kernel_memory_percent": 5}).status_code == 422
+
+
+def test_protected_versions_are_pinned(environment: KernelEnvironment) -> None:
+    from importlib import metadata
+
+    pinned = environment.protected()
+    assert set(pinned) == set(PROTECTED_PACKAGES)
+    assert pinned["numpy"] == metadata.version("numpy")
+    lines = environment.constraints.read_text(encoding="utf-8").splitlines()
+    assert f"duckdb=={metadata.version('duckdb')}" in lines
+    config = (environment.path / "pip.ini").read_text(encoding="utf-8")
+    assert f"constraint = {environment.constraints}" in config
+    assert environment.environment()["PIP_CONSTRAINT"] == str(environment.constraints)
+
+
+def test_existing_environment_gets_pins(tmp_path: Path) -> None:
+    environment = KernelEnvironment(tmp_path / "venv").ensure()
+    environment.constraints.unlink()
+    (environment.path / "pip.ini").unlink()
+    environment.ensure()
+    assert environment.constraints.exists() and (environment.path / "pip.ini").exists()
+
+
+def test_explain_conflict() -> None:
+    output = (
+        "The conflict is caused by:\n    needsold 1.0 depends on numpy==1.0\n"
+        "    The user requested (constraint) numpy==2.5.4\n"
+        "    The user requested (constraint) numpy==2.5.4\n"
+    )
+    message = explain_conflict(output)
+    assert message is not None
+    assert "would change numpy 2.5.4" in message
+    assert "cb, SQL cells and Delta tables" in message
+    assert explain_conflict("ERROR: No matching distribution found for nope") is None
+
+
+def test_installs_cannot_change_protected_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from importlib import metadata
+
+    wheels = tmp_path / "wheels"
+    build_wheel(wheels, "needsold", requires="numpy==1.0")
+    build_wheel(wheels, "compatible", requires="numpy>=1")
+    monkeypatch.setenv("PIP_NO_INDEX", "1")
+    monkeypatch.setenv("PIP_FIND_LINKS", str(wheels))
+    environment = KernelEnvironment(tmp_path / "venv")
+    manager = PackageManager(environment, before_reset=lambda: None)
+    try:
+        refused = manager.wait(manager.install("needsold").id)
+        assert refused.state == JobState.FAILED
+        assert refused.error is not None and "would change numpy" in refused.error
+        assert "would change numpy" in refused.output
+        direct = manager.wait(manager.install("numpy==1.0").id)
+        assert direct.state == JobState.FAILED
+        assert "would change numpy" in (direct.error or "")
+        assert manager.wait(manager.install("compatible").id).state == JobState.SUCCEEDED
+        version = run(environment, "import numpy; print(numpy.__version__)")
+        assert version == metadata.version("numpy")
+        assert [p.name for p in environment.installed()] == ["compatible"]
+
+        shell = subprocess.run(
+            [str(environment.python), "-m", "pip", "install", "numpy==1.0"],
+            capture_output=True,
+            text=True,
+            env={k: v for k, v in environment.environment().items() if k != "PIP_CONSTRAINT"},
+            stdin=subprocess.DEVNULL,
+        )
+        assert shell.returncode != 0, "pip.ini must pin numpy even without PIP_CONSTRAINT"
+        assert "(constraint) numpy==" in shell.stdout + shell.stderr
+    finally:
+        manager.shutdown()

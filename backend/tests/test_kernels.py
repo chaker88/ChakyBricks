@@ -262,3 +262,23 @@ def test_sql_cells_support_writes(kernel: tuple[Services, KernelSession, Recorde
 
     events = recorder.run("rejected", "%%sql\nUPDATE sales SET amount = 0")
     assert "UPDATE statements are not supported" in "".join(outputs(events)[-1]["traceback"])
+
+
+def test_pip_magic_explains_protected_versions(
+    kernel: tuple[Services, KernelSession, Recorder],
+    tmp_path: Path,
+) -> None:
+    _, _, recorder = kernel
+    wheels = tmp_path / "wheels"
+    build_wheel(wheels, "needsold", requires="numpy==1.0")
+    find_links = f"--no-index --find-links {wheels.as_posix()}"
+    events = recorder.run("magic", f"%pip install {find_links} needsold", timeout=120)
+    streams = "".join(o["text"] for o in outputs(events) if o["output_type"] == "stream")
+    assert "(constraint) numpy==" in streams
+    assert "Nothing was installed: this would change numpy" in streams
+
+    events = recorder.run("bang", f"!pip install {find_links} needsold", timeout=120)
+    assert "(constraint) numpy==" in stdout(events) + "".join(
+        o["text"] for o in outputs(events) if o["output_type"] == "stream"
+    )
+    assert "needsold" not in stdout(recorder.run("check", "!pip list"))

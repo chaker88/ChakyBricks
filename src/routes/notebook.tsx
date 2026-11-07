@@ -15,7 +15,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { CellEditorHandle, RunMode } from "@/components/notebook/cell-editor";
-import { InsertBar, NotebookCell } from "@/components/notebook/notebook-cell";
+import { AddCellBar, InsertBar } from "@/components/notebook/add-cell";
+import { NotebookCell } from "@/components/notebook/notebook-cell";
 import { RunningKernelsButton } from "@/components/notebook/running-kernels";
 import { EmptyState } from "@/components/page";
 import { QueryNameDialog } from "@/components/sql/query-name-dialog";
@@ -316,12 +317,14 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
                 dispatch={dispatch}
                 onRun={runCell}
                 onActivate={setActiveId}
+                onAdd={insertCell}
                 complete={complete}
               />
               <InsertBar onInsert={(type) => insertCell(index + 1, type)} />
             </div>
           ))}
-          <p className="pt-2 pb-8 text-center text-[11px] text-muted-foreground">
+          <AddCellBar onInsert={(type) => insertCell(doc.cells.length, type)} />
+          <p className="pt-3 pb-8 text-center text-[11px] text-muted-foreground">
             Shift+Enter run and move on · Ctrl+Enter run · Alt+Enter run and insert · use{" "}
             <code className="font-mono">cb.sql()</code>,{" "}
             <code className="font-mono">cb.table()</code>,{" "}

@@ -285,3 +285,9 @@ export function starterCellSpecs(table: string): CellSpec[] {
 export function notebookUrl(name: string): string {
   return `/notebooks/${encodeURIComponent(name)}`;
 }
+
+export const ADD_LABELS: { value: CellType; label: string }[] = [
+  { value: "python", label: "Code" },
+  { value: "sql", label: "SQL" },
+  { value: "markdown", label: "Markdown" },
+];

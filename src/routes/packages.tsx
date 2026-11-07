@@ -103,6 +103,15 @@ export function PackagesPage() {
               </Button>
             </form>
             <p className="text-xs text-muted-foreground">
+              Pinned so cb, SQL cells and Delta tables keep working:{" "}
+              <span className="font-mono">
+                {Object.entries(data.protected)
+                  .map(([name, version]) => `${name} ${version}`)
+                  .join(", ")}
+              </span>
+              . Installs that would change these are refused with an explanation.
+            </p>
+            <p className="text-xs text-muted-foreground">
               Installs from PyPI into this workspace's notebook environment (needs internet).
               Restart running kernels to use newly installed packages. In a notebook you can also
               run <code className="font-mono">%pip install name</code>.
