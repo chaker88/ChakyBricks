@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { ResultGrid } from "@/components/result-grid";
 import type { RowSet } from "@/lib/api-types";
 import { parseAnsi } from "@/lib/ansi";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, plural } from "@/lib/format";
 import { renderMarkdown, sanitizeHtml, sanitizeSvg } from "@/lib/markdown";
 import {
   PLOTLY_MIME,
@@ -112,7 +112,7 @@ function TableOutput({ payload }: { payload: TablePayload }) {
       </div>
       <div className="text-[11px] text-muted-foreground">
         {payload.truncated
-          ? `Showing ${formatNumber(payload.rows.length)} of ${formatNumber(payload.row_count)} rows`
+          ? `Showing ${formatNumber(payload.rows.length)} of ${plural(payload.row_count, "row")}`
           : `${formatNumber(payload.row_count)} ${payload.row_count === 1 ? "row" : "rows"}`}
       </div>
     </div>

@@ -1,0 +1,9 @@
+Official license texts for components whose packages ship without a license file.
+Used by scripts/generate_notices.py (SUPPLEMENTAL_TEXTS).
+
+arro3-core-MIT.txt, arro3-core-Apache-2.0.txt   https://github.com/kylebarron/arro3 (LICENSE_MIT, LICENSE_APACHE)
+react-remove-scroll-bar-MIT.txt                 https://github.com/theKashey/react-remove-scroll-bar (LICENSE)
+alloc-stdlib-BSD-3-Clause.txt                   https://github.com/dropbox/rust-alloc-no-stdlib (LICENSE)
+selectors-MPL-2.0.txt                           MPL-2.0, as published by the Servo project, https://github.com/servo/servo (LICENSE); selectors is part of https://github.com/servo/stylo
+tauri-plugin-Apache-2.0.txt, tauri-plugin-MIT.txt   https://github.com/tauri-apps/tauri (LICENSE-APACHE-2.0, LICENSE-MIT)
+webview2-rs-MIT.txt                             https://github.com/wravery/webview2-rs (LICENSE), for webview2-com, webview2-com-macros, webview2-com-sys

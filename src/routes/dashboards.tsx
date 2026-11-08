@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
-import { EmptyState, Page } from "@/components/page";
+import { EmptyState, ErrorState, Page } from "@/components/page";
 import { QueryNameDialog } from "@/components/sql/query-name-dialog";
 import {
   AlertDialog,
@@ -43,7 +43,7 @@ import { formatDateTime } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/dashboard-types";
 
 export function DashboardsPage() {
-  const { data, isLoading } = useDashboards();
+  const { data, isLoading, isError, error, refetch } = useDashboards();
   const client = useClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -93,6 +93,8 @@ export function DashboardsPage() {
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
         </div>
+      ) : isError ? (
+        <ErrorState title="Couldn't load dashboards" error={error} onRetry={() => void refetch()} />
       ) : !data?.length ? (
         <EmptyState
           icon={LayoutDashboard}

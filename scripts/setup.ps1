@@ -11,7 +11,7 @@ if (-not (Test-Path $venvPython)) {
 
 Write-Host "Installing backend dependencies..."
 & $venvPython -m pip install --upgrade pip --quiet
-& $venvPython -m pip install -e "$backend[dev]" --quiet
+& $venvPython -m pip install -c (Join-Path $backend "constraints.txt") -e "$backend[dev]" --quiet
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
 Write-Host "Installing frontend dependencies..."

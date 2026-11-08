@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { TriangleAlert, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Page({
@@ -23,6 +23,34 @@ export function Page({
       </div>
       {children}
     </div>
+  );
+}
+
+export function ErrorState({
+  title,
+  error,
+  onRetry,
+}: {
+  title: string;
+  error: unknown;
+  onRetry?: () => void;
+}) {
+  return (
+    <EmptyState
+      icon={TriangleAlert}
+      title={title}
+      description={error instanceof Error ? error.message : "Something went wrong. Try again."}
+      action={
+        onRetry && (
+          <button
+            onClick={onRetry}
+            className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          >
+            Try again
+          </button>
+        )
+      }
+    />
   );
 }
 

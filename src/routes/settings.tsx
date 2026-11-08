@@ -7,10 +7,22 @@ import { RunningKernelsList } from "@/components/notebook/running-kernels";
 import { Page } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useSettings, useUpdateSettings } from "@/hooks/use-api";
 import { useBackend } from "@/lib/backend-context";
 import { pickDirectory } from "@/lib/files";
+import { SHORTCUT_GROUPS } from "@/lib/shortcuts";
+import { applyShellPrefs, backgroundNoticeSeen, markBackgroundNoticeSeen } from "@/lib/shell";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +86,12 @@ export function SettingsPage() {
           <KernelMemorySetting />
         </SettingRow>
         <SettingRow
+          label="Background"
+          description="Jobs run only while ChakyBricks is running. Keep it in the system tray to let scheduled jobs continue after you close the window."
+        >
+          <BackgroundSettings />
+        </SettingRow>
+        <SettingRow
           label="Python packages"
           description="Packages available to notebooks: install, uninstall or reset to defaults."
         >
@@ -103,12 +121,103 @@ export function SettingsPage() {
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
 
       <section className="mt-8">
+        <h2 className="mb-2 text-sm font-medium">Keyboard shortcuts</h2>
+        <div className="grid gap-x-8 gap-y-5 rounded-xl border p-4 md:grid-cols-2">
+          {SHORTCUT_GROUPS.map((group) => (
+            <div key={group.title}>
+              <h3 className="mb-1.5 text-xs font-medium text-muted-foreground">{group.title}</h3>
+              <dl className="space-y-1">
+                {group.items.map((item) => (
+                  <div key={item.keys} className="flex items-center justify-between gap-4 text-sm">
+                    <dt className="text-muted-foreground">{item.action}</dt>
+                    <dd>
+                      <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px] whitespace-nowrap">
+                        {item.keys}
+                      </kbd>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
         <h2 className="mb-2 text-sm font-medium">Running kernels</h2>
         <div className="rounded-xl border">
           <RunningKernelsList />
         </div>
       </section>
     </Page>
+  );
+}
+
+function BackgroundSettings() {
+  const settings = useSettings();
+  const update = useUpdateSettings();
+  const [notice, setNotice] = useState(false);
+
+  if (!settings.data) return <Skeleton className="h-16 w-72" />;
+  const { keep_running_in_background, start_with_system } = settings.data;
+
+  const change = (changes: {
+    keep_running_in_background?: boolean;
+    start_with_system?: boolean;
+  }) => {
+    const next = { keep_running_in_background, start_with_system, ...changes };
+    update.mutate(changes, {
+      onSuccess: () => {
+        applyShellPrefs(next).catch((error: unknown) =>
+          toast.error(error instanceof Error ? error.message : String(error)),
+        );
+        if (
+          (next.keep_running_in_background || next.start_with_system) &&
+          !backgroundNoticeSeen()
+        ) {
+          markBackgroundNoticeSeen();
+          setNotice(true);
+        }
+      },
+      onError: (error) => toast.error(error.message),
+    });
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <label className="flex items-center justify-between gap-6 text-sm">
+        Keep running in the background when the window is closed
+        <Switch
+          checked={keep_running_in_background}
+          disabled={update.isPending}
+          onCheckedChange={(value) => change({ keep_running_in_background: value })}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-6 text-sm">
+        Start with the system, minimized to the tray
+        <Switch
+          checked={start_with_system}
+          disabled={update.isPending}
+          onCheckedChange={(value) => change({ start_with_system: value })}
+        />
+      </label>
+      <AlertDialog open={notice} onOpenChange={setNotice}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Jobs only run while ChakyBricks is running</AlertDialogTitle>
+            <AlertDialogDescription>
+              With this option ChakyBricks stays in the system tray after you close the window, so
+              scheduled jobs keep running. If you quit it from the tray menu, shut down the computer
+              or sign out, jobs stop; runs that were due in the meantime are skipped, not made up
+              later. Use “Pause all jobs” in the tray menu to stop schedules temporarily.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 

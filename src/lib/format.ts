@@ -42,3 +42,7 @@ export function formatCell(value: unknown): string {
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
+
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${formatNumber(count)} ${count === 1 ? singular : pluralForm}`;
+}

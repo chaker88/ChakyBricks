@@ -11,8 +11,8 @@ const TOKEN_ENV: &str = "CHAKYBRICKS_TOKEN";
 
 #[derive(Clone, Serialize)]
 pub struct BackendInfo {
-    port: u16,
-    token: String,
+    pub port: u16,
+    pub token: String,
 }
 
 pub struct Backend {
@@ -50,6 +50,10 @@ impl Backend {
             info,
             child: Mutex::new(Some(child)),
         })
+    }
+
+    pub fn info(&self) -> &BackendInfo {
+        &self.info
     }
 
     pub fn shutdown(&self) {

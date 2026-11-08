@@ -4,7 +4,7 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 ## Current status (2026-11-08)
 
-**Phase 6 (jobs) is implemented and committed — awaiting the user's hand test** (checklist below). Phase 5 hand test passed earlier except the items still unchecked in its list. Next after approval: Phase 7 (packaging: release workflow, size reductions, 10 GB load test, installer polish). Also done this session, before Phase 6: combo-chart secondary Y axis, deterministic cross-tile series colours with per-tile overrides, `scripts\dev.ps1` stale-port cleanup, Apache-2.0 licensing/attribution (LICENSE, NOTICE, Settings → About, installer/exe metadata, `THIRD_PARTY_NOTICES.txt`) and the cross-platform rule.
+**Phase 7 (packaging + polish) is implemented, the installer is built and the work is committed and pushed — awaiting the user's hand test on the installed `.exe`** (checklist below). The release tag `v1.0.0` has deliberately **not** been created yet; create it only when the user approves (the workflow in `.github/workflows/release.yml` then builds and publishes the installer). Phase 6 hand test passed (query/notebook jobs incl. writes, history/logs, failure, Cancel, Skipped, enable switch, interrupted run, notebook rename, dev.ps1 port cleanup, About links). Phase 5 hand test passed earlier except the items still unchecked in its list.
 
 ### Done and approved
 
@@ -38,18 +38,21 @@ Open Dashboards → **Sample dashboard** (generates `main.demo_sales`, 200k rows
 - [ ] Rename / duplicate / delete from the dashboards list; Home → "New dashboard".
 - [ ] Not yet done in a real `.exe`: `npm run build:app` and run the installed app (nothing in Phase 5 touches the runtime, but html-to-image/jspdf are new frontend deps).
 
-### Phase 6 — still to test by hand
+### Phase 7 — still to test by hand (on the installed .exe)
 
-Jobs → **New job** (jobs run only while the app is open; the page says so):
+Install `src-tauri\target\release\bundle\nsis\ChakyBricks_1.0.0_x64-setup.exe` over/after uninstalling the old one (use a scratch workspace if you want to keep your data untouched):
 
-- [ ] Create a **saved-query job** (e.g. a `CREATE OR REPLACE TABLE … AS SELECT` refresh) → **Run now** → run appears as Running, then Succeeded; the log shows the write message and the table updates (Catalog, and a dashboard on it after Refresh).
-- [ ] Create a **notebook job**: cells run in order, stdout/errors appear in the log, SQL cells work, a failing cell marks the run Failed with `Cell N failed: …`, later cells do not run. The notebook file is not modified, and an open notebook's own kernel is untouched (job kernels show in Settings → Running kernels while running).
-- [ ] **Cancel run** stops a long query and a long notebook cell (status Cancelled).
-- [ ] Schedules: every N minutes/hours, daily, weekly (weekday buttons), monthly, custom cron; the dialog previews the next runs; an invalid cron shows the error. Let a 1–2 minute interval job fire on its own and check "Scheduled" runs appear; **pause** (switch) stops it; edit changes the next run time.
-- [ ] A scheduled run that is due while the previous run is still going is recorded as **Skipped**. Closing the app mid-run leaves that run as Failed ("ChakyBricks was closed…") on the next start; runs missed while closed are not made up.
-- [ ] Rename a notebook used by a job (the job follows it); delete a notebook/saved query used by a job → next run fails with a clear message; delete a job → its history goes.
-- [ ] Run history keeps the last 200 runs per job; the detail page log follows a running job live.
-- [ ] Not yet done in a real `.exe`: `npm run build:app` (APScheduler is a new backend dependency; `check_runtime.py` follows the pyproject closure automatically) and run the installed app; also check the installer/exe file properties (publisher "Chaker Saidi") and that LICENSE/NOTICE/THIRD_PARTY_NOTICES.txt are in the install folder.
+- [ ] Installer: opens, installs, Start-menu shortcut starts the app; file properties show version 1.0.0 and publisher "Chaker Saidi"; LICENSE, NOTICE and THIRD_PARTY_NOTICES.txt are in the install folder (the notices file now has a license text for every component); the app shows **v1.0.0** (Settings → Engine / About).
+- [ ] Core smoke test in the installed app: import a CSV (incl. Arabic column names), SQL (`CREATE TABLE … AS SELECT`), a notebook (`cb.sql`, `cb.save`, matplotlib, `%pip install` of a package), Sample dashboard + Export PNG/PDF, a job (Run now + a 1-minute schedule), clean shutdown (no leftover `python.exe` / kernels in Task Manager).
+- [ ] **Settings → Background**, both switches off by default. Turn on "Keep running in the background": a one-time notice explains that jobs only run while ChakyBricks is running. Close the window → the app stays in the tray (no window, backend still running; a 1-minute scheduled job keeps firing). Tray: left-click and **Open** restore the window; **Pause all jobs** (checkmark) stops scheduled runs and the Jobs page shows the "paused" banner with **Resume all**; **Quit** exits everything (check Task Manager). Turn the switch off → closing the window quits again and the tray icon disappears.
+- [ ] "Start with the system, minimized to the tray": turn on, sign out/in (or reboot) → ChakyBricks starts hidden in the tray; turn off → the startup entry is gone (Task Manager → Startup apps). Starting a second copy while one is running just shows the existing window.
+- [ ] **Schedule…** button in the notebook toolbar and in a saved query's ⋯ menu opens the job dialog pre-filled (type, target, name); the toast after creating has a "View job" link.
+- [ ] Settings → **Keyboard shortcuts** list is accurate (spot-check a few); pluralisation ("1 row", "1 cell ran" in a notebook job log); error states on list pages (stop the backend → "Couldn't load …" with Try again).
+- [ ] `cb.save(df, "new_table", mode="append")` creates the table when it does not exist.
+- [ ] Open `D:\chakerFolder\ChakyBricks-testdata\workspace` as the workspace (Settings → Workspace folder → Change…; **change it back afterwards**) and look at `main.sales_events` (88.5 M rows): a bar/line/KPI dashboard on it loads in ~20 s the first time and instantly the second time.
+- [ ] README renders on GitHub (screenshots in `docs/screenshots`), `docs/load-test.md` numbers are plausible to you.
+
+Not verified by me: the GitHub Actions workflow has never run (needs the tag/`workflow_dispatch` on GitHub); the tray/autostart code compiled and passed clippy but was not exercised by hand.
 
 ### Known behaviour / open notes
 
@@ -143,13 +146,14 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
    - removes stale outputs (`src-tauri\target\release\python`, `backend\build`) — Tauri copies resources over old ones but never deletes, and setuptools' `build/` can leak deleted modules into the wheel;
    - runs `scripts\build_runtime.ps1`: downloads the pinned python-build-standalone CPython (release/version/SHA-256 in the script, cached in `build\cache`), installs `./backend` constrained to the dev venv's freeze, **force-reinstalls `chakybricks`** (pip skips an unchanged version otherwise → stale backend code), prunes `tests`/`__pycache__`, precompiles bytecode (`compileall --invalidation-mode unchecked-hash`; cold start ~2 s instead of ~15 s);
    - runs `scripts\check_runtime.py` with the runtime's Python: fails if site-packages has anything outside the dependency closure of `chakybricks` (+ pip), or is missing a dependency; repeated on the copy in `target\release\python` after `tauri build`;
-   - `tauri build --config src-tauri/tauri.bundle.conf.json` → `src-tauri\target\release\bundle\nsis\ChakyBricks_0.1.0_x64-setup.exe` (~193 MiB, ~15–20 min mostly makensis LZMA; installed ~976 MB).
+   - `tauri build --config src-tauri/tauri.bundle.conf.json` → `src-tauri\target\release\bundle\nsis\ChakyBricks_1.0.0_x64-setup.exe` (~193 MiB, ~15–20 min mostly makensis LZMA; installed ~976 MB).
    - `npm run build:app -- -CleanRuntime` re-extracts the runtime from scratch.
 3. Smoke test (optional, needs internet for xgboost): `src-tauri\target\release\python\python.exe scripts\smoke_test.py` — backend launched like Tauri, CSV import, kernel + venv creation, cb.sql, matplotlib, `%pip install xgboost`, import from the venv. Uses a temporary app home.
 
 - The runtime lives in `src-tauri\resources\python` (gitignored, ~960 MB, ~20.7k files) and contains a **non-editable copy** of the backend: dev mode (`npm run tauri dev`) uses `backend\.venv` and source directly, but anything testing the bundled runtime needs `build:runtime`/`build:app` after backend changes.
 - First kernel start in a workspace creates the venv (~5–10 s with pip); later starts ~2–3 s.
-- Remaining Phase 7 work: GitHub Actions release workflow (cache the runtime download), size reductions (polars/deltalake/pyarrow/scipy are ~65% of the runtime), 10 GB load test, installer polish.
+- Release: `.github/workflows/release.yml` (tag `v*`, or manual run = build only) runs setup + `scripts\check.ps1` + `npm run build:app` on windows-latest, checks the tag equals the `package.json` version, uploads the installer + SHA-256 and creates the GitHub Release with notes. `backend/constraints.txt` (pip freeze of the dev venv, no editable) pins the dev environment — and therefore the bundled runtime — in CI; refresh it when you upgrade backend deps. Version lives in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`/`Cargo.lock`, `backend/pyproject.toml`, `backend/chakybricks/__init__.py`.
+- Not done (optional, later): size reductions (polars/deltalake/pyarrow/scipy are ~65% of the runtime), code signing.
 
 ## Commits
 

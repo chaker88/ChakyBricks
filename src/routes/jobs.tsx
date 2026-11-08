@@ -4,6 +4,7 @@ import {
   Info,
   MoreHorizontal,
   NotebookPen,
+  Pause,
   Pencil,
   Play,
   Plus,
@@ -14,7 +15,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { JobDialog } from "@/components/jobs/job-dialog";
 import { StatusBadge } from "@/components/jobs/status-badge";
-import { EmptyState, Page } from "@/components/page";
+import { EmptyState, ErrorState, Page } from "@/components/page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,9 +36,40 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useClient } from "@/hooks/use-api";
-import { useDeleteJob, useJobs, useRunJob, useTargetLabel, useUpdateJob } from "@/hooks/use-jobs";
+import {
+  useDeleteJob,
+  useJobs,
+  useJobsPaused,
+  useRunJob,
+  useSetJobsPaused,
+  useTargetLabel,
+  useUpdateJob,
+} from "@/hooks/use-jobs";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import type { Job } from "@/lib/jobs";
+
+function PausedBanner() {
+  const paused = useJobsPaused();
+  const setPaused = useSetJobsPaused();
+  if (!paused.data?.paused) return null;
+  return (
+    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+      <Pause className="size-4 shrink-0" />
+      <span className="flex-1">
+        All scheduled jobs are paused. Nothing runs on its own until you resume (Run now still
+        works).
+      </span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={setPaused.isPending}
+        onClick={() => setPaused.mutate(false, { onError: (e) => toast.error(e.message) })}
+      >
+        Resume all
+      </Button>
+    </div>
+  );
+}
 
 function JobsNotice() {
   return (
@@ -72,12 +104,19 @@ export function JobsPage() {
         </Button>
       }
     >
+      <PausedBanner />
       <JobsNotice />
       {jobs.isLoading ? (
         <div className="space-y-2">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
+      ) : jobs.isError ? (
+        <ErrorState
+          title="Couldn't load jobs"
+          error={jobs.error}
+          onRetry={() => void jobs.refetch()}
+        />
       ) : !jobs.data?.length ? (
         <EmptyState
           icon={CalendarClock}

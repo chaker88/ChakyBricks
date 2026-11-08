@@ -18,7 +18,7 @@ import { useCatalog, useClient, usePreview, useStartImport } from "@/hooks/use-a
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { ImportMode, PreviewResponse, SourceOptions } from "@/lib/api-types";
 import { typeIcon } from "@/lib/column-types";
-import { formatBytes, formatNumber } from "@/lib/format";
+import { formatBytes, plural } from "@/lib/format";
 import {
   DELIMITERS,
   buildImportRequest,
@@ -128,7 +128,7 @@ export function ConfigureStep({
             </Badge>
             <span>{formatBytes(preview.file_size)}</span>
             {preview.estimated_rows !== null && (
-              <span>· ~{formatNumber(preview.estimated_rows)} rows</span>
+              <span>· ~{plural(preview.estimated_rows, "row")}</span>
             )}
             <span className="truncate">· {preview.path}</span>
           </DialogDescription>
@@ -371,7 +371,7 @@ export function ConfigureStep({
 
           <div className="flex min-h-0 flex-1 flex-col">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Preview · first {sample.rows.length} rows
+              Preview · first {plural(sample.rows.length, "row")}
               {(livePreview.isFetching || reloading) && <Loader2 className="size-3 animate-spin" />}
             </h3>
             {previewError ? (

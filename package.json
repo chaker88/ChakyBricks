@@ -1,7 +1,7 @@
 {
   "name": "chakybricks",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "ChakyBricks — a single-user, offline desktop lakehouse",
   "author": "Chaker Saidi (https://github.com/chaker88)",
   "license": "Apache-2.0",

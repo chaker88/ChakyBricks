@@ -247,3 +247,20 @@ def test_job_api(client: TestClient) -> None:
     assert client.post(f"/api/job-runs/{run_id}/cancel").status_code == 409
     assert client.delete(f"/api/jobs/{job_id}").status_code == 204
     assert client.get(f"/api/jobs/{job_id}").status_code == 404
+
+
+def test_pause_all_jobs_skips_scheduled_fires(client: TestClient) -> None:
+    services: Services = client.app.state.services  # type: ignore[attr-defined]
+    saved = services.queries.create_saved("quick", "SELECT 1 AS one")
+    job = services.jobs.create(
+        "Quick", "query", str(saved.id), Schedule(type="interval", minutes=5)
+    )
+    assert client.put("/api/jobs/state", json={"paused": True}).json() == {"paused": True}
+    services.jobs._fire(job["id"])
+    assert services.jobs.store.list_runs(job["id"]) == []
+    assert client.get("/api/jobs/state").json() == {"paused": True}
+    client.put("/api/jobs/state", json={"paused": False})
+    services.jobs._fire(job["id"])
+    runs = services.jobs.store.list_runs(job["id"])
+    assert len(runs) == 1
+    assert wait_for_run(services, runs[0]["id"])["status"] == "succeeded"

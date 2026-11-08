@@ -353,7 +353,7 @@ class DashboardQueries:
         series = q.dimension(breakdown)
         table_order = _order(config.sort, config.dimension, 1, "__cb_d", "__cb_m{}")
         sql = (
-            f"WITH base AS (SELECT * FROM {q.source.ref}{q.where}), "
+            f"WITH base AS NOT MATERIALIZED (SELECT * FROM {q.source.ref}{q.where}), "
             f"top_d AS (SELECT __cb_d, row_number() OVER (ORDER BY {table_order}) "
             f"AS __cb_dr FROM (SELECT {dim} AS __cb_d, {exprs[0]} AS __cb_m0 FROM base GROUP BY 1) "
             f"ORDER BY __cb_dr LIMIT {limit + 1}), "

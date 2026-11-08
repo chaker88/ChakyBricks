@@ -8,11 +8,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { EmptyState, Page } from "@/components/page";
+import { EmptyState, ErrorState, Page } from "@/components/page";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCatalog } from "@/hooks/use-api";
 import { useBackend } from "@/lib/backend-context";
-import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
+import { formatBytes, formatDateTime, plural } from "@/lib/format";
 import { useImport } from "@/lib/import-context";
 
 export function HomePage() {
@@ -85,6 +85,12 @@ export function HomePage() {
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-3/4" />
           </div>
+        ) : catalog.isError ? (
+          <ErrorState
+            title="Couldn't load your tables"
+            error={catalog.error}
+            onRetry={() => void catalog.refetch()}
+          />
         ) : recent.length === 0 ? (
           <EmptyState
             icon={Clock}
@@ -105,7 +111,7 @@ export function HomePage() {
                   {table.name}
                 </span>
                 <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                  {formatNumber(table.row_count)} rows · {formatBytes(table.size_bytes)} ·{" "}
+                  {plural(table.row_count, "row")} · {formatBytes(table.size_bytes)} ·{" "}
                   {formatDateTime(table.updated_at)}
                 </span>
               </Link>

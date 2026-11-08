@@ -383,7 +383,16 @@ class JobManager:
         self._cancel_handle(handle)
         return self.store.get_run(run_id)
 
+    def set_paused(self, paused: bool) -> None:
+        self.services.jobs_paused = paused
+
+    @property
+    def paused(self) -> bool:
+        return self.services.jobs_paused
+
     def _fire(self, job_id: int) -> None:
+        if self.paused:
+            return
         try:
             self._start_run(job_id, "schedule")
         except ConflictError:
@@ -453,7 +462,9 @@ class JobManager:
     def _run_notebook(self, job: Job, handle: _ActiveRun, run_log: _RunLog) -> str:
         notebook = self.services.notebooks.read(job.target)
         cells = [c for c in notebook["cells"] if c["cell_type"] == "code" and c["source"].strip()]
-        run_log.line(f"Notebook: {job.target} ({len(cells)} code cells)")
+        run_log.line(
+            f"Notebook: {job.target} ({len(cells)} code {'cell' if len(cells) == 1 else 'cells'})"
+        )
         if handle.cancelled:
             raise _Cancelled
         session = self.services.kernels.start_job_kernel(job.target)
@@ -477,7 +488,7 @@ class JobManager:
             session.remove_listener(events.put)
             self.services.kernels.shutdown(session.id)
             handle.session = None
-        return f"{len(cells)} cells ran"
+        return f"{len(cells)} {'cell' if len(cells) == 1 else 'cells'} ran"
 
     def _wait_for_cell(
         self,

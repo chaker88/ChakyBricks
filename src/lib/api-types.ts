@@ -100,6 +100,8 @@ export interface AppSettings {
   row_limit: number;
   kernel_memory_percent: number;
   kernel_memory_limit_mb: number;
+  keep_running_in_background: boolean;
+  start_with_system: boolean;
 }
 
 export interface WriteOutcome {

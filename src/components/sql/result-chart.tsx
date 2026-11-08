@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format";
 import { BarChart, LineChart, PieChart, ScatterChart } from "echarts/charts";
 import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
@@ -164,7 +165,7 @@ export function ResultChart({ data }: { data: RowSet }) {
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Charts the {data.rows.length.toLocaleString()} rows loaded in the grid.
+          Charts the {plural(data.rows.length, "row")} loaded in the grid.
         </p>
       </aside>
       <div className="relative min-w-0 flex-1 p-3">

@@ -52,7 +52,7 @@ import {
 } from "@/hooks/use-api";
 import type { HistoryEntry, TableDetail } from "@/lib/api-types";
 import { typeIcon } from "@/lib/column-types";
-import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
+import { formatBytes, formatDateTime, formatNumber, plural } from "@/lib/format";
 import { identifierError } from "@/lib/import";
 import { cn } from "@/lib/utils";
 import { Stat } from "@/routes/catalog";
@@ -307,7 +307,7 @@ function describeEntry(entry: HistoryEntry): string {
   const mode = entry.parameters["mode"];
   if (typeof mode === "string") parts.push(`mode ${mode}`);
   const added = metrics["num_added_rows"] ?? metrics["numOutputRows"];
-  if (typeof added === "number") parts.push(`${formatNumber(added)} rows added`);
+  if (typeof added === "number") parts.push(`${plural(added, "row")} added`);
   const files = metrics["num_added_files"] ?? metrics["numFiles"];
   if (typeof files === "number") parts.push(`${formatNumber(files)} files`);
   return parts.join(" · ") || "—";
@@ -424,9 +424,9 @@ function DropDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Drop {fullName}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the table, its {formatNumber(table.row_count)} rows and its
-            version history ({formatBytes(table.size_bytes)} on disk). The original source file is
-            not touched.
+            This permanently deletes the table, its {plural(table.row_count, "row")} and its version
+            history ({formatBytes(table.size_bytes)} on disk). The original source file is not
+            touched.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

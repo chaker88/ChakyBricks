@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 import type { TableSummary } from "@/lib/api-types";
@@ -139,7 +140,7 @@ monaco.languages.registerCompletionItemProvider("python", {
             label: name,
             kind: monaco.languages.CompletionItemKind.Struct,
             insertText: name,
-            detail: `${t.row_count.toLocaleString()} rows`,
+            detail: plural(t.row_count, "row"),
             range,
           };
         }),

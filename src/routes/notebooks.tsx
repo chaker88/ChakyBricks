@@ -2,7 +2,7 @@ import { MoreHorizontal, NotebookPen, Pencil, Plus, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
-import { EmptyState, Page } from "@/components/page";
+import { EmptyState, ErrorState, Page } from "@/components/page";
 import { QueryNameDialog } from "@/components/sql/query-name-dialog";
 import {
   AlertDialog,
@@ -34,7 +34,7 @@ import { formatBytes, formatDateTime } from "@/lib/format";
 import { notebookUrl, starterCellSpecs } from "@/lib/notebook";
 
 export function NotebooksPage() {
-  const { data, isLoading } = useNotebooks();
+  const { data, isLoading, isError, error, refetch } = useNotebooks();
   const create = useCreateNotebook();
   const navigate = useNavigate();
   const client = useClient();
@@ -86,6 +86,8 @@ export function NotebooksPage() {
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
         </div>
+      ) : isError ? (
+        <ErrorState title="Couldn't load notebooks" error={error} onRetry={() => void refetch()} />
       ) : !data?.length ? (
         <EmptyState
           icon={NotebookPen}

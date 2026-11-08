@@ -158,3 +158,13 @@ def test_settings_roundtrip(client: TestClient, tmp_path: Path, files: dict[str,
     reset = client.put("/api/settings", json={"memory_limit_mb": None}).json()
     assert reset["memory_limit_mb"] is None
     assert Path(reset["workspace"]) == new_workspace.resolve()
+
+
+def test_background_settings_roundtrip(client: TestClient) -> None:
+    settings = client.get("/api/settings").json()
+    assert settings["keep_running_in_background"] is False
+    assert settings["start_with_system"] is False
+    updated = client.put("/api/settings", json={"keep_running_in_background": True}).json()
+    assert updated["keep_running_in_background"] is True
+    assert updated["start_with_system"] is False
+    assert client.get("/api/settings").json()["keep_running_in_background"] is True

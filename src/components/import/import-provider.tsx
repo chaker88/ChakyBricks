@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ImportWizard } from "@/components/import/import-wizard";
 import { queryKeys, useImportJob } from "@/hooks/use-api";
-import { formatNumber } from "@/lib/format";
+import { plural } from "@/lib/format";
 import { ImportContext } from "@/lib/import-context";
 import { isTerminal } from "@/lib/import";
 
@@ -65,7 +65,7 @@ function JobWatcher({
     if (notifyRef.current) {
       const name = `${job.schema}.${job.table}`;
       if (job.state === "succeeded") {
-        toast.success(`Imported ${formatNumber(job.rows_written)} rows into ${name}`, {
+        toast.success(`Imported ${plural(job.rows_written, "row")} into ${name}`, {
           action: { label: "Open", onClick: () => navigate(`/catalog/${job.schema}/${job.table}`) },
         });
       } else if (job.state === "failed") {

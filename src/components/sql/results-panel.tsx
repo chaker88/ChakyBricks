@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useExportResult, type RunState } from "@/hooks/use-sql";
 import { pickSavePath } from "@/lib/files";
-import { formatBytes, formatDuration, formatNumber } from "@/lib/format";
+import { formatBytes, formatDuration, formatNumber, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () => void }) {
@@ -96,7 +96,7 @@ export function ResultsPanel({ run, onCancel }: { run?: RunState; onCancel: () =
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  Full result ({formatNumber(rowsResult.row_count)} rows)
+                  Full result ({plural(rowsResult.row_count, "row")})
                 </DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => exportResult("csv")}>CSV</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => exportResult("parquet")}>

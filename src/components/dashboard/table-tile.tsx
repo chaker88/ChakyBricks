@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CellValue } from "@/lib/api-types";
 import { toNumber } from "@/lib/chart";
-import { formatCell } from "@/lib/format";
+import { formatCell, plural } from "@/lib/format";
 import { metricLabel } from "@/lib/dashboard-chart";
 import type { TileData, TileSpec } from "@/lib/dashboard-types";
 import { formatBucket, formatValue } from "@/lib/number-format";
@@ -126,7 +126,7 @@ export function TableTile({ tile, data }: { tile: TileSpec; data: TileData }) {
       </div>
       {data.truncated && (
         <div className="shrink-0 pt-1.5 text-[11px] text-muted-foreground">
-          Showing the first {rows.length.toLocaleString()} rows
+          Showing the first {plural(rows.length, "row")}
         </div>
       )}
     </div>

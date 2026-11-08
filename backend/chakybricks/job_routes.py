@@ -50,6 +50,21 @@ def preview_schedule(body: SchedulePreview, services: ServicesDep) -> dict[str, 
     }
 
 
+class PauseUpdate(BaseModel):
+    paused: bool
+
+
+@router.get("/jobs/state")
+def jobs_state(services: ServicesDep) -> dict[str, bool]:
+    return {"paused": services.jobs.paused}
+
+
+@router.put("/jobs/state")
+def set_jobs_state(body: PauseUpdate, services: ServicesDep) -> dict[str, bool]:
+    services.jobs.set_paused(body.paused)
+    return {"paused": services.jobs.paused}
+
+
 @router.get("/jobs/{job_id}")
 def get_job(job_id: int, services: ServicesDep) -> dict[str, Any]:
     return services.jobs.get(job_id)

@@ -1,4 +1,5 @@
 import {
+  CalendarClock,
   ChevronDown,
   CircleDot,
   Eraser,
@@ -15,6 +16,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { CellEditorHandle, RunMode } from "@/components/notebook/cell-editor";
+import { ScheduleDialog } from "@/components/jobs/schedule-dialog";
 import { AddCellBar, InsertBar } from "@/components/notebook/add-cell";
 import { NotebookCell } from "@/components/notebook/notebook-cell";
 import { RunningKernelsButton } from "@/components/notebook/running-kernels";
@@ -79,6 +81,7 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
   const [focusId, setFocusId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [renaming, setRenaming] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const editors = useRef(new Map<string, CellEditorHandle>());
   const docRef = useRef(doc);
   const dirty = useRef(false);
@@ -251,6 +254,15 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
         </span>
         <div className="flex-1" />
         <RunningKernelsButton />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => setScheduling(true)}
+        >
+          <CalendarClock />
+          Schedule…
+        </Button>
         <Button size="sm" className="h-7 text-xs" disabled={!kernel.ready} onClick={runAll}>
           <Play />
           Run all
@@ -334,6 +346,14 @@ function NotebookEditor({ name, initial }: { name: string; initial: NotebookDoc 
         </div>
       </div>
 
+      {scheduling && (
+        <ScheduleDialog
+          kind="notebook"
+          target={name}
+          name={`Run ${name}`}
+          onClose={() => setScheduling(false)}
+        />
+      )}
       {renaming && (
         <QueryNameDialog
           open

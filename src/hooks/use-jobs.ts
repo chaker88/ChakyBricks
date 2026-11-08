@@ -1,3 +1,4 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useClient } from "@/hooks/use-api";
 import { useSavedQueries } from "@/hooks/use-sql";
@@ -23,6 +24,29 @@ export function useJobs() {
     queryFn: () => requireClient(client).get<Job[]>("/api/jobs"),
     enabled: !!client,
     refetchInterval: (query) => (query.state.data?.some((job) => job.running) ? 1500 : 15_000),
+  });
+}
+
+export function useJobsPaused() {
+  const client = useClient();
+  return useQuery({
+    queryKey: ["jobs-paused"] as const,
+    queryFn: () => requireClient(client).get<{ paused: boolean }>("/api/jobs/state"),
+    enabled: !!client,
+    refetchInterval: 5000,
+  });
+}
+
+export function useSetJobsPaused() {
+  const client = useClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (paused: boolean) =>
+      requireClient(client).put<{ paused: boolean }>("/api/jobs/state", { paused }),
+    onSuccess: (state) => {
+      queryClient.setQueryData(["jobs-paused"], state);
+      if (isTauri()) void invoke("set_tray_paused", { paused: state.paused }).catch(() => {});
+    },
   });
 }
 

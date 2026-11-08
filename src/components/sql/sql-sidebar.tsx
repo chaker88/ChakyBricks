@@ -1,4 +1,5 @@
 import {
+  CalendarClock,
   Ban,
   CheckCircle2,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ScheduleDialog } from "@/components/jobs/schedule-dialog";
 import { QueryNameDialog } from "@/components/sql/query-name-dialog";
 import {
   AlertDialog,
@@ -46,7 +48,7 @@ import {
 import type { SavedQuery } from "@/lib/api-types";
 import { filterCatalog } from "@/lib/catalog";
 import { typeIcon } from "@/lib/column-types";
-import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
+import { formatDateTime, formatDuration, plural } from "@/lib/format";
 import { tableReference } from "@/lib/sql-text";
 import { cn } from "@/lib/utils";
 
@@ -221,6 +223,7 @@ function SavedList({
 }) {
   const { data, isLoading } = useSavedQueries();
   const [renaming, setRenaming] = useState<SavedQuery | null>(null);
+  const [scheduling, setScheduling] = useState<SavedQuery | null>(null);
   const [deleting, setDeleting] = useState<SavedQuery | null>(null);
   const update = useUpdateSavedQuery();
   const remove = useDeleteSavedQuery();
@@ -262,6 +265,10 @@ function SavedList({
                 <Pencil />
                 Rename…
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setScheduling(query)}>
+                <CalendarClock />
+                Schedule…
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(query)}>
                 <Trash2 />
                 Delete…
@@ -270,6 +277,14 @@ function SavedList({
           </DropdownMenu>
         </div>
       ))}
+      {scheduling && (
+        <ScheduleDialog
+          kind="query"
+          target={String(scheduling.id)}
+          name={scheduling.name}
+          onClose={() => setScheduling(null)}
+        />
+      )}
       {renaming && (
         <QueryNameDialog
           open
@@ -369,7 +384,7 @@ function HistoryList({ onOpen }: { onOpen: (sql: string) => void }) {
               <span className="line-clamp-2 font-mono text-[11px] break-all">{entry.sql}</span>
               <span className="mt-0.5 block text-[10px] text-muted-foreground">
                 {formatDateTime(entry.started_at)} · {formatDuration(entry.duration_ms / 1000)}
-                {entry.row_count !== null && ` · ${formatNumber(entry.row_count)} rows`}
+                {entry.row_count !== null && ` · ${plural(entry.row_count, "row")}`}
               </span>
             </span>
           </button>

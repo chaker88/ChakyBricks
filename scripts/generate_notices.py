@@ -32,6 +32,20 @@ MAX_FILE_BYTES = 400_000
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_runtime import closure
 
+TEXT_DIR = Path(__file__).resolve().parent / "license_texts"
+# Components whose packages ship no license file: official texts vendored in scripts/license_texts
+# (sources in SOURCES.txt). Keyed by (ecosystem, name).
+SUPPLEMENTAL_TEXTS = {
+    ("Python", "arro3-core"): ["arro3-core-MIT.txt", "arro3-core-Apache-2.0.txt"],
+    ("npm", "react-remove-scroll-bar"): ["react-remove-scroll-bar-MIT.txt"],
+    ("Rust", "alloc-stdlib"): ["alloc-stdlib-BSD-3-Clause.txt"],
+    ("Rust", "selectors"): ["selectors-MPL-2.0.txt"],
+    ("Rust", "tauri-plugin"): ["tauri-plugin-Apache-2.0.txt", "tauri-plugin-MIT.txt"],
+    ("Rust", "webview2-com"): ["webview2-rs-MIT.txt"],
+    ("Rust", "webview2-com-macros"): ["webview2-rs-MIT.txt"],
+    ("Rust", "webview2-com-sys"): ["webview2-rs-MIT.txt"],
+}
+
 BUNDLED_WITH_PYTHON = [
     ("CPython 3.12 (python-build-standalone)", "PSF-2.0", "https://www.python.org/"),
     ("OpenSSL", "Apache-2.0", "https://www.openssl.org/"),
@@ -246,6 +260,21 @@ def rust_components() -> list[Component]:
     return components
 
 
+def add_supplemental(groups: list[tuple[str, list[Component]]]) -> None:
+    for _, components in groups:
+        for c in components:
+            if c.texts:
+                continue
+            for name in SUPPLEMENTAL_TEXTS.get((c.ecosystem, c.name), []):
+                text = read_text(TEXT_DIR / name)
+                if text:
+                    c.texts.append(text)
+
+
+def missing_texts(groups: list[tuple[str, list[Component]]]) -> list[Component]:
+    return [c for _, g in groups for c in g if not c.texts]
+
+
 def render(groups: list[tuple[str, list[Component]]]) -> str:
     lines = [
         "ChakyBricks — third-party notices",
@@ -274,7 +303,7 @@ def render(groups: list[tuple[str, list[Component]]]) -> str:
             refs = (
                 f"  [text: {', '.join(ids)}]"
                 if ids
-                else "  [no license file shipped; see URL]"
+                else "  [NO LICENSE TEXT]"
             )
             url = f"  {c.url}" if c.url else ""
             lines.append(f"{c.name} {c.version} — {c.license}{url}{refs}")
@@ -316,6 +345,15 @@ def main() -> int:
         ("npm packages (frontend)", npm_components()),
         ("Rust crates (desktop shell)", rust_components()),
     ]
+    add_supplemental(groups)
+    missing = missing_texts(groups)
+    if missing:
+        print(
+            f"{len(missing)} components have no license text; add one to scripts/license_texts "
+            "and SUPPLEMENTAL_TEXTS: "
+            + ", ".join(f"{c.ecosystem}:{c.name} {c.version}" for c in missing)
+        )
+        return 1
     content = render(groups)
     total = sum(len(g) for _, g in groups)
     if args.check:
@@ -328,13 +366,7 @@ def main() -> int:
         print(f"THIRD_PARTY_NOTICES.txt is up to date ({total} components)")
         return 0
     OUTPUT.write_text(content, encoding="utf-8", newline="\n")
-    missing = [c for _, g in groups for c in g if not c.texts]
     print(f"Wrote {OUTPUT.name}: {total} components, {len(content) / 1024:.0f} KiB")
-    if missing:
-        print(
-            f"{len(missing)} components without a license file: "
-            + ", ".join(f"{c.name}" for c in missing[:40])
-        )
     return 0
 
 

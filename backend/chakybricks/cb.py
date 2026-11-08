@@ -20,7 +20,7 @@ from chakybricks import delta
 from chakybricks.catalog import Catalog, parse_full_name
 from chakybricks.config import Settings
 from chakybricks.engine import Engine, quote_ident
-from chakybricks.errors import InvalidInputError, NotFoundError
+from chakybricks.errors import InvalidInputError
 from chakybricks.ingest.jobs import ImportManager
 from chakybricks.ingest.sources import sanitize_column_names, storage_type
 from chakybricks.statements import parse_statements
@@ -133,14 +133,15 @@ def save(
     mode: Literal["overwrite", "append"] = "overwrite",
     partition_by: str | None = None,
 ) -> dict[str, Any]:
-    """Writes a Polars/pandas DataFrame or Arrow table to a Delta table and registers it."""
+    """Writes a Polars/pandas DataFrame or Arrow table to a Delta table and registers it.
+
+    mode="append" adds to the table, creating it first when it does not exist yet.
+    """
     if mode not in ("overwrite", "append"):
         raise InvalidInputError("mode must be 'overwrite' or 'append'")
     ctx = _context()
     schema, table_name = parse_full_name(name)
     existing = ctx.catalog.find_table(schema, table_name)
-    if mode == "append" and existing is None:
-        raise NotFoundError(f"Table {schema}.{table_name} does not exist; save it first")
 
     data = _to_arrow(df)
     names = sanitize_column_names(data.column_names)
@@ -163,7 +164,7 @@ def save(
             value = f"#{index}" if kind == str(raw) else f"CAST(#{index} AS {kind})"
             expressions.append(f"{value} AS {quote_ident(target)}")
         reader = rel.project(", ".join(expressions)).to_arrow_reader(BATCH_ROWS)
-        appending = mode == "append"
+        appending = mode == "append" and existing is not None
         write_deltalake(
             str(path),
             reader,

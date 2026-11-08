@@ -27,6 +27,7 @@ class Services:
         self.store = SettingsStore(home)
         self.settings = self.store.load()
         self._lock = threading.Lock()
+        self.jobs_paused = False
         self._open()
 
     def _open(self) -> None:

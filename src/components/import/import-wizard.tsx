@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { useCancelImport, useClient, useImportJob } from "@/hooks/use-api";
 import type { PreviewResponse } from "@/lib/api-types";
 import { pickDataFile } from "@/lib/files";
-import { formatDuration, formatNumber } from "@/lib/format";
+import { formatDuration, formatNumber, plural } from "@/lib/format";
 import { fileName, isTerminal } from "@/lib/import";
 
 type Step =
@@ -199,7 +199,7 @@ function ProgressStep({
           )}
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
             <span>
-              {formatNumber(job.rows_written)} rows
+              {plural(job.rows_written, "row")}
               {job.estimated_rows ? ` of ~${formatNumber(job.estimated_rows)}` : ""}
             </span>
             <span>
@@ -212,7 +212,7 @@ function ProgressStep({
 
       {job.state === "succeeded" && (
         <p className="text-sm text-muted-foreground">
-          {formatNumber(job.rows_written)} rows in {formatDuration(job.elapsed_seconds)}.
+          {plural(job.rows_written, "row")} in {formatDuration(job.elapsed_seconds)}.
         </p>
       )}
       {job.state === "failed" && (

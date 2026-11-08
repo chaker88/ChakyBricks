@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: build/cache
+          key: runtime-${{ hashFiles('scripts/build_runtime.ps1') }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cargo-
+
+      - name: Check that the tag matches the app version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}"
+          if ("${{ github.ref_type }}" -eq "tag" -and $tag -ne "v$version") {
+            throw "Tag $tag does not match the version $version in package.json"
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Set up the dev environment
+        shell: pwsh
+        run: scripts\setup.ps1
+
+      - name: Run all checks
+        shell: pwsh
+        run: scripts\check.ps1
+
+      - name: Build the installer
+        shell: pwsh
+        run: npm run build:app
+
+      - name: Collect the installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem src-tauri\target\release\bundle\nsis -Filter "*-setup.exe" |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          New-Item -ItemType Directory -Force dist-release | Out-Null
+          Copy-Item $installer.FullName dist-release\
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($installer.Name)" | Out-File -FilePath "dist-release\$($installer.Name).sha256" -Encoding ascii
+          "INSTALLER_NAME=$($installer.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "INSTALLER_SHA=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist-release
+
+      - name: Write release notes
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          @"
+          ## ChakyBricks $env:VERSION
+
+          An offline desktop lakehouse for Windows: import data, query it with SQL and Python notebooks, build dashboards and schedule jobs, all on your machine.
+
+          ### Install
+
+          1. Download **$env:INSTALLER_NAME** below and run it. Windows SmartScreen may warn that the installer is unsigned: choose *More info → Run anyway*.
+          2. Start ChakyBricks from the Start menu. The first notebook in a workspace takes a few seconds longer while its Python environment is created.
+
+          SHA-256: ``$env:INSTALLER_SHA``
+
+          Requirements: Windows 10/11 64-bit with WebView2 (preinstalled on current Windows), about 1 GB of disk space, 8 GB of RAM or more recommended for large datasets.
+
+          Scheduled jobs run only while ChakyBricks is running. Settings → Background can keep it in the system tray.
+
+          ### Changes
+          "@ | Out-File release-notes.md -Encoding utf8
+
+      - name: Create the GitHub release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release create $tag (Get-ChildItem dist-release).FullName `
+            --title "ChakyBricks $env:VERSION" `
+            --notes-file release-notes.md `
+            --generate-notes `
+            --verify-tag

@@ -30,7 +30,7 @@ describe("BackendClient", () => {
   });
 
   it("retries until the backend is healthy", async () => {
-    const health = { status: "ok", version: "0.1.0", uptime_seconds: 0 };
+    const health = { status: "ok", version: "1.0.0", uptime_seconds: 0 };
     vi.spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new TypeError("connection refused"))
       .mockResolvedValueOnce(new Response(JSON.stringify(health), { status: 200 }));

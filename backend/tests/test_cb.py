@@ -75,8 +75,14 @@ def test_save_overwrite_append_and_inputs(kernel_env: Services) -> None:
     assert sorted(cb.table("nums").collect()["x"].to_list()) == [1, 2, 3, 4, 5]
     replaced = cb.save(pl.DataFrame({"y": ["new"]}), "nums")
     assert (replaced["version"], replaced["columns"], replaced["rows"]) == (4, ["y"], 1)
-    with pytest.raises(NotFoundError):
-        cb.save(pl.DataFrame({"x": [1]}), "nope", mode="append")
+    created = cb.save(pl.DataFrame({"x": [1, 2]}), "fresh", mode="append")
+    assert (created["table"], created["rows"], created["version"]) == ("main.fresh", 2, 0)
+    cb.save(pl.DataFrame({"x": [3]}), "fresh", mode="append")
+    assert sorted(cb.table("fresh").collect()["x"].to_list()) == [1, 2, 3]
+    cb.save(
+        pl.DataFrame({"g": ["a", "b"], "v": [1, 2]}), "fresh_parts", mode="append", partition_by="g"
+    )
+    assert (kernel_env.workspace.warehouse / "main" / "fresh_parts" / "g=a").is_dir()
     with pytest.raises(InvalidInputError):
         cb.save([1, 2, 3], "bad")
     with pytest.raises(InvalidInputError):

@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format";
 import type { ColumnInfo, TableSummary } from "@/lib/api-types";
 
 export type CompletionKind = "keyword" | "function" | "schema" | "table" | "column";
@@ -212,7 +213,7 @@ export function completionsAt(
           label: t.name,
           kind: "table",
           insertText: t.name,
-          detail: `${t.row_count.toLocaleString()} rows`,
+          detail: plural(t.row_count, "row"),
           sortText: `0${t.name}`,
         }));
     }
@@ -232,7 +233,7 @@ export function completionsAt(
       label: insertText,
       kind: "table",
       insertText,
-      detail: `${t.row_count.toLocaleString()} rows`,
+      detail: plural(t.row_count, "row"),
       sortText: `1${insertText}`,
     });
   }
