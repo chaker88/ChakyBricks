@@ -4,7 +4,9 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 ## Current status (2026-11-08)
 
-**Phase 7 (packaging + polish) is complete.** Part A of the hand test passed on the installed 1.0.0 build. GitHub Actions cannot run right now (billing issue on the user's GitHub account), so v1.0.0 is published manually; the workflow in `.github/workflows/release.yml` stays for later. Release notes: `docs/release-notes-1.0.0.md`. The `v1.0.0` git tag has **not** been created — create it only when the user says so. Phase 6 hand test passed earlier; Phase 5 hand test passed except the items still unchecked below.
+**v1.0.0 was released manually on 2026-11-08** (GitHub release "ChakyBricks 1.0.0", tag `v1.0.0`, installer attached, marked Latest). Phase 7 is complete; Part A of its hand test passed on the installed build. The GitHub Actions release workflow (`.github/workflows/release.yml`) has **never run** because of a billing issue on the user's GitHub account — once that is fixed, run it manually (`workflow_dispatch`, build only) to verify it before the next release. Release notes: `docs/release-notes-1.0.0.md`.
+
+**Next work (not started):** (1) v1.1 fixes from real-world use — collect them in `docs/v1.1-backlog.md`; (2) Linux support later, via a branch on a Linux machine, following the cross-platform rule in Conventions. Don't start either until the user asks.
 
 ### Done and approved
 
