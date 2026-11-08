@@ -6,6 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "chakybricks"
 version = "0.1.0"
 description = "ChakyBricks desktop lakehouse backend"
+license = "Apache-2.0"
+authors = [{ name = "Chaker Saidi" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
@@ -28,6 +30,7 @@ dependencies = [
     "plotly>=7.1",
     "scikit-learn>=1.9",
     "scipy>=1.18",
+    "apscheduler>=3.11,<4",
 ]
 
 [project.optional-dependencies]
@@ -61,7 +64,7 @@ strict = true
 packages = ["chakybricks"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow.*", "pandas.*", "psutil.*"]
+module = ["pyarrow.*", "pandas.*", "psutil.*", "apscheduler.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

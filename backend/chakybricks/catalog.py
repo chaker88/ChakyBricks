@@ -62,6 +62,30 @@ MIGRATIONS = [
         updated_at TEXT NOT NULL
     );
     """,
+    """
+    CREATE TABLE jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        kind TEXT NOT NULL,
+        target TEXT NOT NULL,
+        schedule TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    CREATE TABLE job_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        trigger TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        duration_ms INTEGER,
+        message TEXT NOT NULL DEFAULT '',
+        log TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX job_runs_by_job ON job_runs (job_id, id DESC);
+    """,
 ]
 
 

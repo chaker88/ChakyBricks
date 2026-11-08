@@ -9,6 +9,7 @@ from chakybricks.dashboards import DashboardStore
 from chakybricks.engine import Engine
 from chakybricks.errors import ConflictError, InvalidInputError
 from chakybricks.ingest.jobs import ImportManager
+from chakybricks.jobs import JobManager
 from chakybricks.kernel_env import VENV_ENV, KernelEnvironment
 from chakybricks.kernels import KernelRegistry
 from chakybricks.notebooks import NotebookStore
@@ -44,6 +45,8 @@ class Services:
         self.sql = QueryRunner(self.engine, self.queries, lambda: self.settings, SqlWriter(self))
         self.dashboards = DashboardStore(self.catalog)
         self.dashboard_queries = DashboardQueries(self.catalog, self.queries, self.sql)
+        self.jobs = JobManager(self)
+        self.jobs.start()
 
     def update_settings(self, changes: dict[str, object]) -> Settings:
         with self._lock:
@@ -66,6 +69,7 @@ class Services:
             return updated
 
     def close(self) -> None:
+        self.jobs.shutdown()
         self.kernels.shutdown_all()
         self.packages.shutdown()
         self.imports.shutdown()

@@ -48,8 +48,10 @@ class KernelSession:
         workspace: Workspace,
         settings: Settings,
         environment: KernelEnvironment,
+        purpose: str = "interactive",
     ) -> None:
         self.id = uuid.uuid4().hex
+        self.purpose = purpose
         self.notebook = notebook
         self.workspace = workspace
         self.settings = settings
@@ -160,6 +162,7 @@ class KernelSession:
         return {
             "id": self.id,
             "notebook": self.notebook,
+            "purpose": self.purpose,
             "status": self.status,
             "pid": self.pid,
             "started_at": self.started_at,
@@ -392,9 +395,30 @@ class KernelRegistry:
     def start(self, notebook: str) -> KernelSession:
         with self._lock:
             for session in self._sessions.values():
-                if session.notebook == notebook and session.status != "dead":
+                if (
+                    session.notebook == notebook
+                    and session.purpose == "interactive"
+                    and session.status != "dead"
+                ):
                     return session
             session = KernelSession(notebook, self.workspace, self.settings(), self.environment)
+            self._sessions[session.id] = session
+        try:
+            self.environment.ensure()
+            session.start()
+        except Exception:
+            with self._lock:
+                self._sessions.pop(session.id, None)
+            session.shutdown()
+            raise
+        return session
+
+    def start_job_kernel(self, notebook: str) -> KernelSession:
+        """A private kernel for a scheduled run, so it never touches the one a user has open."""
+        session = KernelSession(
+            notebook, self.workspace, self.settings(), self.environment, purpose="job"
+        )
+        with self._lock:
             self._sessions[session.id] = session
         try:
             self.environment.ensure()
@@ -414,7 +438,11 @@ class KernelRegistry:
 
     def for_notebook(self, notebook: str) -> KernelSession | None:
         return next(
-            (s for s in self._sessions.values() if s.notebook == notebook and s.status != "dead"),
+            (
+                s
+                for s in self._sessions.values()
+                if s.notebook == notebook and s.purpose == "interactive" and s.status != "dead"
+            ),
             None,
         )
 

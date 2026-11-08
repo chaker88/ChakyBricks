@@ -13,13 +13,14 @@ import { HomePage } from "@/routes/home";
 import { NotebooksPage } from "@/routes/notebooks";
 import { PackagesPage } from "@/routes/packages";
 import { DashboardsPage } from "@/routes/dashboards";
-import { JobsPage } from "@/routes/sections";
+import { JobsPage } from "@/routes/jobs";
 import { SettingsPage } from "@/routes/settings";
 import { TablePage } from "@/routes/table-page";
 
 const SqlPage = lazy(() => import("@/routes/sql"));
 const NotebookPage = lazy(() => import("@/routes/notebook"));
 const DashboardPage = lazy(() => import("@/routes/dashboard"));
+const JobPage = lazy(() => import("@/routes/job"));
 
 function createQueryClient() {
   return new QueryClient({
@@ -73,6 +74,14 @@ export function App() {
                       }
                     />
                     <Route path="jobs" element={<JobsPage />} />
+                    <Route
+                      path="jobs/:id"
+                      element={
+                        <Suspense fallback={<PageSkeleton />}>
+                          <JobPage />
+                        </Suspense>
+                      }
+                    />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="settings/packages" element={<PackagesPage />} />
                   </Route>

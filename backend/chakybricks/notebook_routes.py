@@ -50,6 +50,7 @@ def save_notebook(name: str, body: dict[str, Any], services: ServicesDep) -> dic
 def rename_notebook(name: str, body: NotebookRename, services: ServicesDep) -> dict[str, Any]:
     new_name = services.notebooks.rename(name, body.name)
     services.kernels.rename_notebook(name, new_name)
+    services.jobs.store.notebook_renamed(name, new_name)
     return {"name": new_name}
 
 
