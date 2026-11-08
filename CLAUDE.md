@@ -4,7 +4,7 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 ## Current status (2026-11-08)
 
-**Phase 7 (packaging + polish) is implemented, the installer is built and the work is committed and pushed — awaiting the user's hand test on the installed `.exe`** (checklist below). The release tag `v1.0.0` has deliberately **not** been created yet; create it only when the user approves (the workflow in `.github/workflows/release.yml` then builds and publishes the installer). Phase 6 hand test passed (query/notebook jobs incl. writes, history/logs, failure, Cancel, Skipped, enable switch, interrupted run, notebook rename, dev.ps1 port cleanup, About links). Phase 5 hand test passed earlier except the items still unchecked in its list.
+**Phase 7 (packaging + polish) is complete.** Part A of the hand test passed on the installed 1.0.0 build. GitHub Actions cannot run right now (billing issue on the user's GitHub account), so v1.0.0 is published manually; the workflow in `.github/workflows/release.yml` stays for later. Release notes: `docs/release-notes-1.0.0.md`. The `v1.0.0` git tag has **not** been created — create it only when the user says so. Phase 6 hand test passed earlier; Phase 5 hand test passed except the items still unchecked below.
 
 ### Done and approved
 
@@ -38,7 +38,7 @@ Open Dashboards → **Sample dashboard** (generates `main.demo_sales`, 200k rows
 - [ ] Rename / duplicate / delete from the dashboards list; Home → "New dashboard".
 - [ ] Not yet done in a real `.exe`: `npm run build:app` and run the installed app (nothing in Phase 5 touches the runtime, but html-to-image/jspdf are new frontend deps).
 
-### Phase 7 — still to test by hand (on the installed .exe)
+### Phase 7 — hand-test checklist (Part A passed; the remaining items are optional follow-ups)
 
 Install `src-tauri\target\release\bundle\nsis\ChakyBricks_1.0.0_x64-setup.exe` over/after uninstalling the old one (use a scratch workspace if you want to keep your data untouched):
 
@@ -54,7 +54,7 @@ Install `src-tauri\target\release\bundle\nsis\ChakyBricks_1.0.0_x64-setup.exe` o
 - [ ] Disk cap: every DuckDB connection gets `max_temp_directory_size` = min(50 GB, 50% of free space on the tmp drive); a query that exceeds it fails with "Not enough disk space for this query…" (covered by a backend test; try a huge ORDER BY if you want to see it).
 - [ ] README renders on GitHub (screenshots in `docs/screenshots`), `docs/load-test.md` numbers are plausible to you.
 
-Not verified by me: the GitHub Actions workflow has never run (needs the tag/`workflow_dispatch` on GitHub); the tray/autostart code compiled and passed clippy but was not exercised by hand.
+Not verified: the GitHub Actions workflow has never run (blocked by the billing issue); the tray/autostart code compiled and passed clippy but was not exercised by hand.
 
 ### Known behaviour / open notes
 
