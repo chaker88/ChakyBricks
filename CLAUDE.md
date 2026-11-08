@@ -4,7 +4,15 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 ## Current status (2026-11-08)
 
-**Phase 5 (dashboards) is implemented and awaiting the user's hand test** (checklist below). Next after approval: Phase 6 (jobs). Read SPEC.md §5 and the Phase 6 line first.
+**Phase 5 (dashboards) is implemented and committed.** Hand test in the Tauri dev app: **passed** for charts, edit/save, PNG and PDF export via the save dialog, and data freshness after `INSERT INTO`. **Still to check by hand:** date-range and dropdown filters, cross-filtering, and Discard in edit mode (rest of the checklist below).
+
+**Next session, before Phase 6** (pending changes the user asked for — not started):
+
+1. **Combo charts:** optional secondary (right) Y axis per metric, off by default, with its own number format. (Deliberate exception to the one-axis dataviz rule, at the user's request.)
+2. **Series colours:** the same colour for a dimension value across all tiles of a dashboard, assigned deterministically from the value (not query completion order), with a per-tile override. (Replaces the per-tile `ColorAssigner`.)
+3. **`scripts\dev.ps1`:** detect a stale process on port 1420 and stop it before starting (only node/vite or chakybricks processes from this project). Test runs must always stop any dev servers and app windows they start.
+
+After those: **Phase 6 (jobs)** — read SPEC.md §5 and the Phase 6 line first — then stop for the user's review.
 
 ### Done and approved
 
