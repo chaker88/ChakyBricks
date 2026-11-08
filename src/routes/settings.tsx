@@ -86,6 +86,12 @@ export function SettingsPage() {
           <KernelMemorySetting />
         </SettingRow>
         <SettingRow
+          label="Dashboard queries at once"
+          description="How many tile queries a dashboard runs at the same time. Lower uses less memory; higher loads big dashboards faster."
+        >
+          <DashboardConcurrencySetting />
+        </SettingRow>
+        <SettingRow
           label="Background"
           description="Jobs run only while ChakyBricks is running. Keep it in the system tray to let scheduled jobs continue after you close the window."
         >
@@ -217,6 +223,40 @@ function BackgroundSettings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+const CONCURRENCY_OPTIONS = [1, 2, 3, 4];
+
+function DashboardConcurrencySetting() {
+  const settings = useSettings();
+  const update = useUpdateSettings();
+  if (!settings.data) return <Skeleton className="h-8 w-40" />;
+  const current = settings.data.dashboard_concurrency;
+  return (
+    <div role="radiogroup" className="flex gap-1 rounded-lg bg-muted p-1">
+      {CONCURRENCY_OPTIONS.map((count) => (
+        <button
+          key={count}
+          role="radio"
+          aria-checked={current === count}
+          onClick={() =>
+            update.mutate(
+              { dashboard_concurrency: count },
+              { onError: (error) => toast.error(error.message) },
+            )
+          }
+          className={cn(
+            "rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+            current === count
+              ? "bg-background text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {count}
+        </button>
+      ))}
     </div>
   );
 }

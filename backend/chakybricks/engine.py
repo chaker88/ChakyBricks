@@ -1,4 +1,5 @@
 import logging
+import shutil
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -24,11 +25,38 @@ def quote_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+GIB = 1024**3
+MAX_TEMP_CAP_BYTES = 50 * GIB
+MIN_TEMP_CAP_BYTES = 1 * GIB
+DISK_FULL_MESSAGE = (
+    "Not enough disk space for this query: it needs more temporary space than ChakyBricks may "
+    "use on the drive that holds the workspace's tmp folder. Free up disk space, add filters or "
+    "aggregate earlier, or move the workspace to a drive with more room."
+)
+
+
+def temp_cap_bytes(tmp_dir: Path) -> int:
+    """Cap for DuckDB spill files: min(50 GB, half of the free space on the temp folder's drive)."""
+    try:
+        free = shutil.disk_usage(tmp_dir).free
+    except OSError:
+        return MAX_TEMP_CAP_BYTES
+    return max(MIN_TEMP_CAP_BYTES, min(MAX_TEMP_CAP_BYTES, free // 2))
+
+
+def friendly_error(exc: BaseException) -> str:
+    message = str(exc).strip() or type(exc).__name__
+    if "max_temp_directory_size" in message or "No space left" in message:
+        return DISK_FULL_MESSAGE
+    return message
+
+
 def configure_connection(
     con: duckdb.DuckDBPyConnection, settings: Settings, tmp_dir: Path, *, bulk: bool = False
 ) -> None:
     con.execute(f"SET memory_limit = '{settings.effective_memory_limit_mb}MB'")
     con.execute(f"SET temp_directory = {quote_literal(tmp_dir.as_posix())}")
+    con.execute(f"SET max_temp_directory_size = '{temp_cap_bytes(tmp_dir) // (1024 * 1024)}MB'")
     con.execute("SET python_enable_replacements = false")
     if bulk:
         con.execute("SET preserve_insertion_order = false")

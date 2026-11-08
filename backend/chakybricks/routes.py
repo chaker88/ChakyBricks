@@ -41,6 +41,7 @@ class SettingsUpdate(BaseModel):
     memory_limit_mb: int | None = Field(default=None, ge=MIN_MEMORY_LIMIT_MB)
     row_limit: int | None = Field(default=None, ge=MIN_ROW_LIMIT, le=MAX_ROW_LIMIT)
     kernel_memory_percent: int | None = Field(default=None, ge=10, le=100)
+    dashboard_concurrency: int | None = Field(default=None, ge=1, le=8)
     keep_running_in_background: bool | None = None
     start_with_system: bool | None = None
 
@@ -72,6 +73,7 @@ def _settings_payload(services: Services) -> dict[str, Any]:
         "row_limit": settings.row_limit,
         "kernel_memory_percent": settings.kernel_memory_percent,
         "kernel_memory_limit_mb": kernel_memory_limit_mb(settings),
+        "dashboard_concurrency": settings.dashboard_concurrency,
         "keep_running_in_background": settings.keep_running_in_background,
         "start_with_system": settings.start_with_system,
     }
@@ -93,6 +95,8 @@ def update_settings(body: SettingsUpdate, services: ServicesDep) -> dict[str, An
         changes["row_limit"] = body.row_limit
     if body.kernel_memory_percent is not None:
         changes["kernel_memory_percent"] = body.kernel_memory_percent
+    if body.dashboard_concurrency is not None:
+        changes["dashboard_concurrency"] = body.dashboard_concurrency
     if body.keep_running_in_background is not None:
         changes["keep_running_in_background"] = body.keep_running_in_background
     if body.start_with_system is not None:

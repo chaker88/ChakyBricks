@@ -12,7 +12,7 @@ import pyarrow as pa
 
 from chakybricks.catalog import now_iso
 from chakybricks.config import Settings
-from chakybricks.engine import Engine, quote_ident
+from chakybricks.engine import Engine, friendly_error, quote_ident
 from chakybricks.errors import (
     ChakyError,
     InvalidInputError,
@@ -47,7 +47,6 @@ UNORDERED_PREFIXES = ("STRUCT", "MAP", "UNION", "BLOB")
 
 ExportFormat = Literal["csv", "parquet"]
 T = TypeVar("T")
-READ_SLOTS = 4
 
 
 @dataclass
@@ -73,7 +72,8 @@ class QueryRunner:
         self.writer = writer
         self._runs: dict[str, _Run] = {}
         self._lock = threading.Lock()
-        self._read_slots = threading.BoundedSemaphore(READ_SLOTS)
+        self._slot_cv = threading.Condition()
+        self._reading = 0
 
     def run(self, sql: str, query_id: str, limit: int | None = None) -> dict[str, Any]:
         statements = parse_statements(sql)
@@ -162,18 +162,26 @@ class QueryRunner:
                         self._raise_if_cancelled(run)
                         return work(cur)
                 finally:
-                    self._read_slots.release()
+                    self._release_read_slot()
         except duckdb.Error as exc:
             if run.cancelled or isinstance(exc, duckdb.InterruptException):
                 raise QueryCancelledError() from exc
             raise QueryError(_error_message(exc)) from exc
 
     def _acquire_read_slot(self, run: _Run) -> None:
-        while not self._read_slots.acquire(timeout=CANCEL_RETRY_SECONDS):
-            self._raise_if_cancelled(run)
+        with self._slot_cv:
+            while self._reading >= self.settings().dashboard_concurrency:
+                self._slot_cv.wait(timeout=CANCEL_RETRY_SECONDS)
+                self._raise_if_cancelled(run)
+            self._reading += 1
         if run.cancelled:
-            self._read_slots.release()
+            self._release_read_slot()
             raise QueryCancelledError()
+
+    def _release_read_slot(self) -> None:
+        with self._slot_cv:
+            self._reading -= 1
+            self._slot_cv.notify()
 
     def cancel(self, query_id: str) -> bool:
         with self._lock:
@@ -361,4 +369,4 @@ def _column_stats(rel: duckdb.DuckDBPyRelation, column: str, duck_type: str) -> 
 
 
 def _error_message(exc: Exception) -> str:
-    return str(exc).strip() or type(exc).__name__
+    return friendly_error(exc)

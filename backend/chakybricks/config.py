@@ -12,6 +12,7 @@ DEFAULT_ROW_LIMIT = 10_000
 MIN_ROW_LIMIT = 100
 MAX_ROW_LIMIT = 1_000_000
 DEFAULT_KERNEL_MEMORY_PERCENT = 50
+DEFAULT_DASHBOARD_CONCURRENCY = 1
 
 
 def app_home() -> Path:
@@ -36,6 +37,7 @@ class Settings(BaseModel):
     memory_limit_mb: int | None = Field(default=None, ge=MIN_MEMORY_LIMIT_MB)
     row_limit: int = Field(default=DEFAULT_ROW_LIMIT, ge=MIN_ROW_LIMIT, le=MAX_ROW_LIMIT)
     kernel_memory_percent: int = Field(default=DEFAULT_KERNEL_MEMORY_PERCENT, ge=10, le=100)
+    dashboard_concurrency: int = Field(default=DEFAULT_DASHBOARD_CONCURRENCY, ge=1, le=8)
     keep_running_in_background: bool = False
     start_with_system: bool = False
 

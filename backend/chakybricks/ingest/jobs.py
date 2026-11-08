@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from chakybricks import delta
 from chakybricks.catalog import Catalog, normalize_identifier, normalize_schema
-from chakybricks.engine import Engine, quote_ident
+from chakybricks.engine import Engine, friendly_error, quote_ident
 from chakybricks.errors import ConflictError, InvalidInputError, NotFoundError
 from chakybricks.ingest.sources import (
     ColumnSpec,
@@ -314,5 +314,5 @@ def _project_query(
 
 
 def _error_message(exc: BaseException) -> str:
-    message = str(exc).strip() or type(exc).__name__
+    message = friendly_error(exc)
     return message.splitlines()[0] if len(message) > 2000 else message

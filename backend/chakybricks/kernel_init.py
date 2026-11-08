@@ -14,6 +14,7 @@ import polars as pl
 import pyarrow as pa
 
 from chakybricks import cb
+from chakybricks.engine import friendly_error
 from chakybricks.errors import ChakyError
 from chakybricks.kernel_env import explain_conflict
 from chakybricks.serialization import relation_to_json
@@ -62,7 +63,7 @@ def sql_magic(line: str, cell: str) -> pl.DataFrame | None:
     try:
         result = cb.sql(cell)
     except (duckdb.Error, ChakyError) as exc:
-        raise SqlCellError(str(exc)) from None
+        raise SqlCellError(friendly_error(exc)) from None
     if name:
         from IPython import get_ipython
 

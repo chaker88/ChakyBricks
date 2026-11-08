@@ -312,3 +312,27 @@ def test_save_query_result_as_table(client: TestClient, files: dict[str, Path]) 
 
     bad = client.post("/api/sql/save-table", json={**body, "table": "x", "sql": "DROP VIEW orders"})
     assert bad.status_code == 422
+
+
+def test_dashboard_reads_respect_the_concurrency_setting(services: Services) -> None:
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    assert services.settings.dashboard_concurrency == 1
+    services.update_settings({"dashboard_concurrency": 2})
+    lock = threading.Lock()
+    state = {"now": 0, "peak": 0}
+
+    def work(_cur: object) -> None:
+        with lock:
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+        time.sleep(0.15)
+        with lock:
+            state["now"] -= 1
+
+    with ThreadPoolExecutor(6) as pool:
+        for future in [pool.submit(services.sql.run_read, f"c{i}", work) for i in range(6)]:
+            future.result()
+    assert state["peak"] == 2

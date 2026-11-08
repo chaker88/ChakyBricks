@@ -189,6 +189,7 @@ export function useUpdateSettings() {
       memory_limit_mb?: number | null;
       row_limit?: number;
       kernel_memory_percent?: number;
+      dashboard_concurrency?: number;
       keep_running_in_background?: boolean;
       start_with_system?: boolean;
     }) => requireClient(client).put<AppSettings>("/api/settings", changes),

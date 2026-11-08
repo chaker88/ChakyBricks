@@ -27,7 +27,9 @@ PORT = 8897
 TOKEN = secrets.token_hex(16)
 
 
-def call(method: str, path: str, body: object | None = None, timeout: float = 3600) -> Any:
+def call(
+    method: str, path: str, body: object | None = None, timeout: float = 3600
+) -> Any:
     request = urllib.request.Request(
         f"http://127.0.0.1:{PORT}{path}",
         method=method,
@@ -38,7 +40,9 @@ def call(method: str, path: str, body: object | None = None, timeout: float = 36
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read() or b"null")
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"{method} {path}: {exc.code} {exc.read().decode()[:500]}") from exc
+        raise RuntimeError(
+            f"{method} {path}: {exc.code} {exc.read().decode()[:500]}"
+        ) from exc
 
 
 class MemoryMonitor:
@@ -80,7 +84,9 @@ class MemoryMonitor:
                 self.peak_rss = max(self.peak_rss, rss)
                 self.peak_private = max(self.peak_private, private)
                 self.peak_spill = max(self.peak_spill, self._spill())
-                self.min_available = min(self.min_available, psutil.virtual_memory().available)
+                self.min_available = min(
+                    self.min_available, psutil.virtual_memory().available
+                )
             except psutil.Error:
                 continue
 
@@ -126,11 +132,17 @@ def dashboard_tiles(table: str) -> dict[str, dict[str, Any]]:
     total = metric("sum", "total", "Revenue")
     return {
         "kpi revenue": tile("kpi", table, {"metrics": [total]}),
-        "kpi orders": tile("kpi", table, {"metrics": [metric("count", None, "Orders")]}),
-        "kpi customers": tile(
-            "kpi", table, {"metrics": [metric("count_distinct", "customer_id", "Customers")]}
+        "kpi orders": tile(
+            "kpi", table, {"metrics": [metric("count", None, "Orders")]}
         ),
-        "kpi avg price": tile("kpi", table, {"metrics": [metric("avg", "unit_price", "Avg price")]}),
+        "kpi customers": tile(
+            "kpi",
+            table,
+            {"metrics": [metric("count_distinct", "customer_id", "Customers")]},
+        ),
+        "kpi avg price": tile(
+            "kpi", table, {"metrics": [metric("avg", "unit_price", "Avg price")]}
+        ),
         "revenue by month": tile(
             "chart",
             table,
@@ -141,10 +153,14 @@ def dashboard_tiles(table: str) -> dict[str, dict[str, Any]]:
             },
         ),
         "revenue by category": tile(
-            "chart", table, {"chart": "bar", "dimension": {"column": "category"}, "metrics": [total]}
+            "chart",
+            table,
+            {"chart": "bar", "dimension": {"column": "category"}, "metrics": [total]},
         ),
         "status donut": tile(
-            "chart", table, {"chart": "donut", "dimension": {"column": "status"}, "metrics": [total]}
+            "chart",
+            table,
+            {"chart": "donut", "dimension": {"column": "status"}, "metrics": [total]},
         ),
         "region x channel": tile(
             "chart",
@@ -179,11 +195,15 @@ def dashboard_tiles(table: str) -> dict[str, dict[str, Any]]:
     }
 
 
-def load_dashboard(tiles: dict[str, dict[str, Any]], conditions: list[dict[str, Any]]) -> dict:
+def load_dashboard(
+    tiles: dict[str, dict[str, Any]], conditions: list[dict[str, Any]]
+) -> dict:
     def one(item: tuple[str, dict[str, Any]]) -> tuple[str, float, float]:
         name, body = item
         started = time.perf_counter()
-        result = call("POST", "/api/dashboards/query", {**body, "conditions": conditions})
+        result = call(
+            "POST", "/api/dashboards/query", {**body, "conditions": conditions}
+        )
         cached = bool(result.get("cached", False))
         return name, round(time.perf_counter() - started, 2), float(cached)
 
@@ -202,6 +222,7 @@ def main() -> int:
     parser.add_argument("--home", type=Path, required=True)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--table", default="sales_events")
+    parser.add_argument("--concurrency", type=int, help="dashboard queries at once")
     args = parser.parse_args()
 
     args.home.mkdir(parents=True, exist_ok=True)
@@ -225,7 +246,9 @@ def main() -> int:
     total_memory = psutil.virtual_memory().total
     monitor = MemoryMonitor(psutil.Process(backend.pid), args.workspace / "tmp")
     monitor.start()
-    report: dict[str, Any] = {"csv_gb": round(args.csv.stat().st_size / 1024**3, 2)}
+    report: dict[str, Any] = {}
+    if args.csv.exists():
+        report["csv_gb"] = round(args.csv.stat().st_size / 1024**3, 2)
     try:
         for _ in range(100):
             try:
@@ -233,16 +256,13 @@ def main() -> int:
                 break
             except (OSError, RuntimeError):
                 time.sleep(0.3)
+        if args.concurrency:
+            call("PUT", "/api/settings", {"dashboard_concurrency": args.concurrency})
         settings = call("GET", "/api/settings")
+        report["dashboard_concurrency"] = settings["dashboard_concurrency"]
         report["workspace"] = settings["workspace"]
         report["memory_limit_mb"] = settings["effective_memory_limit_mb"]
         report["total_ram_gb"] = round(total_memory / 1024**3, 1)
-
-        preview, seconds = timed(
-            lambda: call("POST", "/api/imports/preview", {"path": str(args.csv)})
-        )
-        report["preview_seconds"] = seconds
-        report["estimated_rows"] = preview["estimated_rows"]
 
         exists = any(
             t["name"] == args.table
@@ -252,6 +272,12 @@ def main() -> int:
         if exists:
             print("table exists; skipping the import", flush=True)
         else:
+            preview, seconds = timed(
+                lambda: call("POST", "/api/imports/preview", {"path": str(args.csv)})
+            )
+            report["preview_seconds"] = seconds
+            report["estimated_rows"] = preview["estimated_rows"]
+
             monitor.reset()
             started = time.perf_counter()
             job = call(
@@ -281,7 +307,7 @@ def main() -> int:
             }
             print("import:", report["import"], flush=True)
             if job["state"] != "succeeded":
-                    raise SystemExit(1)
+                raise SystemExit(1)
 
         table = call("GET", f"/api/tables/main/{args.table}")
         report["table"] = {
@@ -310,7 +336,9 @@ def main() -> int:
         report["queries"] = {}
         for name, sql in queries.items():
             monitor.reset()
-            result, seconds = timed(lambda sql=sql: call("POST", "/api/sql/run", {"sql": sql}))
+            result, seconds = timed(
+                lambda sql=sql: call("POST", "/api/sql/run", {"sql": sql})
+            )
             report["queries"][name] = {
                 "seconds": seconds,
                 "rows_returned": result.get("total_rows", result.get("row_count")),
@@ -339,7 +367,12 @@ def main() -> int:
                 **load_dashboard(tiles, conditions),
                 **monitor.snapshot(total_memory),
             }
-            print("dashboard", label, report["dashboard"][label]["wall_seconds"], flush=True)
+            print(
+                "dashboard",
+                label,
+                report["dashboard"][label]["wall_seconds"],
+                flush=True,
+            )
     finally:
         monitor.stop()
         report["overall_peak"] = monitor.snapshot(total_memory)
