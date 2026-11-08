@@ -250,6 +250,14 @@ function DashboardEditor({ dashboard }: { dashboard: Dashboard }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [colors] = useState(() => new ColorAssigner());
+  const [seriesNames, setSeriesNames] = useState<Record<string, string[]>>({});
+  const reportSeries = useCallback(
+    (tileId: string, names: string[]) =>
+      setSeriesNames((current) =>
+        current[tileId]?.join(" ") === names.join(" ") ? current : { ...current, [tileId]: names },
+      ),
+    [],
+  );
   const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -267,8 +275,14 @@ function DashboardEditor({ dashboard }: { dashboard: Dashboard }) {
     () => rotatePalette(CHART_PALETTE[theme], spec.theme.palette),
     [theme, spec.theme.palette],
   );
-  const colorFor = useCallback(
-    (scope: string, name: string) => palette[colors.slot(scope, name) % palette.length],
+  const colorsFor = useCallback(
+    (tileId: string, names: readonly string[], overrides: Record<string, number> | undefined) => {
+      const slots = colors.assign(tileId, names);
+      return (name: string) => {
+        const slot = overrides?.[name] ?? slots.get(name) ?? 0;
+        return palette[slot % palette.length];
+      };
+    },
     [palette, colors],
   );
   const conditions = useMemo(
@@ -291,8 +305,10 @@ function DashboardEditor({ dashboard }: { dashboard: Dashboard }) {
       conditions,
       crossFilters: crossEnabled ? crossFilters : [],
       selectedTileId,
-      colorFor,
+      colorsFor,
       palette,
+      seriesNames,
+      reportSeries,
       ramp: SEQUENTIAL[theme],
       setCrossFilter,
       selectTile: setSelectedTileId,
@@ -304,8 +320,10 @@ function DashboardEditor({ dashboard }: { dashboard: Dashboard }) {
       conditions,
       crossFilters,
       selectedTileId,
-      colorFor,
+      colorsFor,
       palette,
+      seriesNames,
+      reportSeries,
       theme,
       setCrossFilter,
     ],

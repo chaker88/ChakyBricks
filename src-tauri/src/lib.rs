@@ -6,6 +6,7 @@ use tauri::{Manager, RunEvent};
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let backend = Backend::spawn(app.handle())?;
             app.manage(backend);

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { EChart, type ChartClick } from "@/components/dashboard/echart";
 import { CHART_INK, CHART_PALETTE } from "@/lib/chart";
 import { toggleCrossFilter } from "@/lib/dashboard";
@@ -7,6 +7,7 @@ import {
   SEQUENTIAL,
   buildChartModel,
   buildDashboardOption,
+  colorNames,
   dimensionLabel,
 } from "@/lib/dashboard-chart";
 import { useDashboardView } from "@/lib/dashboard-context";
@@ -27,17 +28,23 @@ export function ChartTile({ tile, data }: { tile: TileSpec; data: TileData }) {
     return condition?.values?.length ? new Set<string | null>(condition.values.map(String)) : null;
   }, [own, dimensionColumn]);
 
+  const names = useMemo(() => colorNames(model), [model]);
+  const { reportSeries } = view;
+  useEffect(() => {
+    reportSeries(tile.id, names);
+  }, [reportSeries, tile.id, names]);
+
   const option = useMemo(() => {
     if (model.keys.length === 0 && model.points.length === 0) return null;
     return buildDashboardOption(model, {
       tokens: { ...CHART_INK[theme], palette: CHART_PALETTE[theme] },
-      color: (name) => view.colorFor(tile.id, name),
+      color: view.colorsFor(tile.id, names, config.colors),
       ramp: SEQUENTIAL[theme],
       selected,
       showLabels: config.labels === true,
       dark: theme === "dark",
     });
-  }, [model, theme, view, tile.id, selected, config.labels]);
+  }, [model, names, theme, view, tile.id, selected, config.labels, config.colors]);
 
   const crossFilterable = view.spec.cross_filter && !view.editing && !!config.dimension;
 

@@ -2,6 +2,9 @@
   "name": "chakybricks",
   "private": true,
   "version": "0.1.0",
+  "description": "ChakyBricks — a single-user, offline desktop lakehouse",
+  "author": "Chaker Saidi (https://github.com/chaker88)",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,6 +26,7 @@
     "@tanstack/react-virtual": "^3.14.26",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-opener": "^2.7.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

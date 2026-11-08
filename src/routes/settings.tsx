@@ -1,7 +1,8 @@
-import { FolderOpen, Monitor, Moon, Package, Sun, type LucideIcon } from "lucide-react";
+import { FolderOpen, Info, Monitor, Moon, Package, Sun, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { AboutDialog } from "@/components/about-dialog";
 import { RunningKernelsList } from "@/components/notebook/running-kernels";
 import { Page } from "@/components/page";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: LucideIcon }
 export function SettingsPage() {
   const { preference, setPreference } = useTheme();
   const backend = useBackend();
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <Page title="Settings" description="Appearance, workspace and engine preferences.">
@@ -91,7 +93,14 @@ export function SettingsPage() {
                 : "Starting…"}
           </span>
         </SettingRow>
+        <SettingRow label="About" description="Version, author, license and third-party notices.">
+          <Button variant="outline" size="sm" onClick={() => setAboutOpen(true)}>
+            <Info />
+            About ChakyBricks
+          </Button>
+        </SettingRow>
       </div>
+      <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
 
       <section className="mt-8">
         <h2 className="mb-2 text-sm font-medium">Running kernels</h2>

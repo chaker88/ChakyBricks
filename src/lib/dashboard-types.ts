@@ -32,6 +32,7 @@ export interface Metric {
   label?: string;
   format?: NumberFormat;
   shape?: "bar" | "line" | null;
+  axis?: "left" | "right";
 }
 
 export interface Sort {
@@ -57,6 +58,8 @@ export interface TileConfig {
   trend?: FieldRef | null;
   text?: string;
   labels?: boolean;
+  /** Per-tile colour overrides: series name → palette slot. */
+  colors?: Record<string, number>;
   lowerIsBetter?: boolean;
 }
 

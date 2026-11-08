@@ -10,6 +10,15 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://github.com/chaker88" },
+        { "url": "https://github.com/chaker88/*" },
+        { "url": "https://linkedin.com/in/chaker-saidi" },
+        { "url": "https://www.linkedin.com/in/chaker-saidi" }
+      ]
+    }
   ]
 }

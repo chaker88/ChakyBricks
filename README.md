@@ -23,3 +23,17 @@ src-tauri/    Tauri shell (spawns the backend sidecar)
 backend/      FastAPI backend (chakybricks package) + tests
 scripts/      Dev and build scripts
 ```
+
+## Created by
+
+ChakyBricks is created by **Chaker Saidi**.
+
+- GitHub: <https://github.com/chaker88>
+- LinkedIn: <https://linkedin.com/in/chaker-saidi>
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution and
+[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for the open-source software ChakyBricks bundles
+(regenerate it with `backend\.venv\Scripts\python scripts\generate_notices.py` after changing
+dependencies).

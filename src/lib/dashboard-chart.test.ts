@@ -175,6 +175,33 @@ describe("chart options", () => {
   });
 });
 
+describe("combo secondary axis", () => {
+  const config: TileConfig = {
+    chart: "combo",
+    dimension: { column: "d" },
+    metrics: [
+      { agg: "sum", column: "v", format: { type: "currency" } },
+      { agg: "count", column: null, shape: "line", axis: "right", format: { type: "percent" } },
+    ],
+  };
+
+  it("adds a right axis only when a metric asks for it", () => {
+    const model = buildChartModel(config, data([["a", 1, 2]]));
+    const option = buildDashboardOption(model, ctx) as {
+      yAxis: { position?: string }[];
+      series: { yAxisIndex: number }[];
+    };
+    expect(option.yAxis).toHaveLength(2);
+    expect(option.yAxis[1].position).toBe("right");
+    expect(option.series.map((s) => s.yAxisIndex)).toEqual([0, 1]);
+    const plain = buildChartModel(
+      { ...config, metrics: config.metrics!.map((m) => ({ ...m, axis: undefined })) },
+      data([["a", 1, 2]]),
+    );
+    expect((buildDashboardOption(plain, ctx) as { yAxis: unknown[] }).yAxis).toHaveLength(1);
+  });
+});
+
 describe("palettes and labels", () => {
   it("rotates without changing colours", () => {
     const rotated = rotatePalette(CHART_PALETTE.light, "sunset");

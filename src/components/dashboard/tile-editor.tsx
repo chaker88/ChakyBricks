@@ -30,6 +30,7 @@ import { useSavedQueries } from "@/hooks/use-sql";
 import type { ColumnInfo } from "@/lib/api-types";
 import { typeCategory } from "@/lib/column-types";
 import { metricLabel } from "@/lib/dashboard-chart";
+import { useDashboardView } from "@/lib/dashboard-context";
 import type {
   Aggregation,
   ChartKind,
@@ -290,22 +291,40 @@ function MetricEditor({
         </Select>
       </div>
       {combo && (
-        <Select
-          value={metric.shape ?? "bar"}
-          onValueChange={(shape) => onChange({ ...metric, shape: shape as "bar" | "line" })}
-        >
-          <SelectTrigger size="sm" className="w-full text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="bar" className="text-xs">
-              Draw as bars
-            </SelectItem>
-            <SelectItem value="line" className="text-xs">
-              Draw as line
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-1.5">
+          <Select
+            value={metric.shape ?? "bar"}
+            onValueChange={(shape) => onChange({ ...metric, shape: shape as "bar" | "line" })}
+          >
+            <SelectTrigger size="sm" className="min-w-0 flex-1 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bar" className="text-xs">
+                Draw as bars
+              </SelectItem>
+              <SelectItem value="line" className="text-xs">
+                Draw as line
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={metric.axis ?? "left"}
+            onValueChange={(axis) => onChange({ ...metric, axis: axis as "left" | "right" })}
+          >
+            <SelectTrigger size="sm" className="min-w-0 flex-1 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left" className="text-xs">
+                Left axis
+              </SelectItem>
+              <SelectItem value="right" className="text-xs">
+                Right axis
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       )}
     </div>
   );
@@ -502,6 +521,65 @@ function SourceEditor({ tile, onChange }: { tile: TileSpec; onChange: (tile: Til
   );
 }
 
+function SeriesColors({ tile, onChange }: { tile: TileSpec; onChange: (tile: TileSpec) => void }) {
+  const view = useDashboardView();
+  const names = view.seriesNames[tile.id] ?? [];
+  const overrides = tile.config.colors ?? {};
+  const colorOf = view.colorsFor(tile.id, names, overrides);
+  if (names.length === 0 || tile.config.chart === "heatmap") return null;
+  const set = (name: string, slot: number | null) => {
+    const next = { ...overrides };
+    if (slot === null) delete next[name];
+    else next[name] = slot;
+    onChange({
+      ...tile,
+      config: { ...tile.config, colors: Object.keys(next).length ? next : undefined },
+    });
+  };
+  return (
+    <Section title="Series colours">
+      <p className="text-[11px] text-muted-foreground">
+        The same value has the same colour in every tile. Override it for this tile only.
+      </p>
+      <div className="space-y-2">
+        {names.slice(0, 12).map((name) => (
+          <div key={name} className="space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span dir="auto" className="truncate">
+                {name}
+              </span>
+              {name in overrides && (
+                <button
+                  type="button"
+                  className="shrink-0 text-primary hover:underline"
+                  onClick={() => set(name, null)}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {view.palette.map((color, slot) => (
+                <button
+                  key={slot}
+                  type="button"
+                  aria-label={`Use colour ${slot + 1} for ${name}`}
+                  onClick={() => set(name, slot)}
+                  className={cn(
+                    "size-5 rounded-md border-2 border-transparent",
+                    colorOf(name) === color && "border-foreground",
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export function TileEditor({
   tile,
   onChange,
@@ -664,7 +742,8 @@ export function TileEditor({
               {metricList(limit, kind === "combo")}
               {kind === "combo" && (
                 <p className="text-[11px] text-muted-foreground">
-                  Bars and lines share one axis, so combine measures with the same unit.
+                  Metrics share the left axis unless you move one to the right axis, which uses its
+                  own number format.
                 </p>
               )}
             </Section>
@@ -684,6 +763,7 @@ export function TileEditor({
                 />
               </Row>
             </Section>
+            <SeriesColors tile={tile} onChange={onChange} />
             <Section title="Display">
               <label className="flex items-center gap-2 text-xs">
                 <Checkbox

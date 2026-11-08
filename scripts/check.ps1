@@ -25,6 +25,7 @@ Step "frontend: vitest" $root { npm test --silent }
 Step "frontend: tsc" $root { npm run typecheck --silent }
 Step "frontend: eslint" $root { npm run lint --silent }
 Step "frontend: prettier" $root { npm run format:check --silent }
+Step "notices: THIRD_PARTY_NOTICES.txt up to date" $root { & "$venv\python.exe" scripts\generate_notices.py --check }
 Step "tauri: cargo test" $tauri { cargo test --quiet }
 Step "tauri: clippy" $tauri { cargo clippy --all-targets --quiet -- -D warnings }
 Step "tauri: rustfmt" $tauri { cargo fmt --check }

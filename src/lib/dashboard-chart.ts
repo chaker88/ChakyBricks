@@ -60,6 +60,8 @@ export interface SeriesModel {
   values: (number | null)[];
   format: NumberFormat | undefined;
   shape: "bar" | "line";
+  /** Drawn against the right-hand axis (combo charts only). */
+  secondary: boolean;
 }
 
 export interface ChartModel {
@@ -152,6 +154,7 @@ export function buildChartModel(config: TileConfig, data: TileData): ChartModel 
       values: keys.map(() => null),
       format,
       shape: shapeOf(0),
+      secondary: false,
     }));
     for (const row of data.rows) {
       const target = series[seriesIndex.get(dimensionKey(row[1])) ?? 0];
@@ -164,6 +167,7 @@ export function buildChartModel(config: TileConfig, data: TileData): ChartModel 
       values: data.rows.map((row) => toNumber(row[1 + i])),
       format: metric.format,
       shape: shapeOf(i),
+      secondary: kind === "combo" && metric.axis === "right",
     }));
   }
 
@@ -228,6 +232,14 @@ function foldSlices(model: ChartModel): ChartModel {
 /** Marks the folded "Other" slice, which cannot be used as a filter. */
 export const OTHER_KEY = "\u0000other";
 
+/** The names that get a colour in a chart (series, or slices for pie/donut). */
+export function colorNames(model: ChartModel): string[] {
+  if (model.kind === "heatmap") return [];
+  if (model.kind === "pie" || model.kind === "donut") return model.labels;
+  if (model.kind === "scatter") return model.series[1] ? [model.series[1].name] : [];
+  return model.series.map((s) => s.name);
+}
+
 export interface ChartContext {
   tokens: ChartTokens;
   color: (name: string) => string;
@@ -242,9 +254,9 @@ export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-function axisFormat(model: ChartModel): NumberFormat | undefined {
-  const formats = model.series.map((s) => JSON.stringify(s.format ?? null));
-  return new Set(formats).size === 1 ? model.series[0]?.format : undefined;
+function axisFormat(series: SeriesModel[]): NumberFormat | undefined {
+  const formats = series.map((s) => JSON.stringify(s.format ?? null));
+  return new Set(formats).size === 1 ? series[0]?.format : undefined;
 }
 
 function dim(ctx: ChartContext, key: string | null): number {
@@ -292,7 +304,9 @@ export function buildDashboardOption(
   const multi = model.series.length > 1;
   const stacked = model.kind === "stacked_bar" || (model.kind === "area" && multi);
   const axisLine = { lineStyle: { color: tokens.grid } };
-  const yFormat = axisFormat(model);
+  const left = model.series.filter((s) => !s.secondary);
+  const right = model.series.filter((s) => s.secondary);
+  const yFormat = axisFormat(left.length ? left : model.series);
   const lastBar = model.series.map((s) => s.shape).lastIndexOf("bar");
   const dense = model.keys.length > 40;
   return {
@@ -319,11 +333,26 @@ export function buildDashboardOption(
         formatter: (_: string, index: number) => model.shortLabels[index] ?? "",
       },
     },
-    yAxis: {
-      type: "value",
-      splitLine: { lineStyle: { color: tokens.grid, opacity: 0.6 } },
-      axisLabel: { ...textStyle, formatter: (v: number) => formatValue(v, yFormat, true, 2) },
-    },
+    yAxis: [
+      {
+        type: "value",
+        splitLine: { lineStyle: { color: tokens.grid, opacity: 0.6 } },
+        axisLabel: { ...textStyle, formatter: (v: number) => formatValue(v, yFormat, true, 2) },
+      },
+      ...(right.length
+        ? [
+            {
+              type: "value",
+              position: "right",
+              splitLine: { show: false },
+              axisLabel: {
+                ...textStyle,
+                formatter: (v: number) => formatValue(v, axisFormat(right), true, 2),
+              },
+            },
+          ]
+        : []),
+    ],
     series: model.series.map((s, index) => {
       const color = ctx.color(s.name);
       const data = s.values.map((v, i) => ({
@@ -333,6 +362,7 @@ export function buildDashboardOption(
       const base = {
         name: s.name,
         data,
+        yAxisIndex: s.secondary ? 1 : 0,
         tooltip: { valueFormatter: full(s) },
         itemStyle: { color },
         emphasis: { focus: "none" },
