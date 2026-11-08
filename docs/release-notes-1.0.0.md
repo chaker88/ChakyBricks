@@ -10,7 +10,7 @@ ChakyBricks is an offline desktop lakehouse for Windows. Import data files of up
 - **Dashboards.** A no-code tile builder (charts, KPIs, tables, text), filters, cross-filtering, palettes and PNG/PDF export, plus a ready-made sample dashboard.
 - **Jobs.** Run a notebook or a saved query on a schedule (interval, daily, weekly, monthly or cron), with run history, live logs, Run now and Cancel.
 - **Background mode (optional).** Keep ChakyBricks in the system tray after closing the window, and optionally start it with Windows, minimized to the tray. Both are off by default.
-- **Large data.** Tested with an 88-million-row, 10 GB CSV on a 16 GB machine: the import took about a minute, and queries and dashboards stayed within the memory limit. Details: [load-test.md](load-test.md).
+- **Large data.** Tested with an 88-million-row, 10 GB CSV on a 16 GB machine: the import took about a minute, and queries and dashboards stayed within the memory limit. Details: [load-test.md](https://github.com/chaker88/ChakyBricks/blob/main/docs/load-test.md).
 
 ## Requirements
 
@@ -38,7 +38,10 @@ The first notebook in a workspace takes a few seconds longer to start while its 
 - **Query temporary space is capped** at the smaller of 50 GB and half of the free space on the workspace's drive; a query that needs more fails with "Not enough disk space for this query".
 - **Pinned core packages.** `duckdb`, `deltalake`, `pyarrow`, `polars`, `numpy`, `pandas` and `ipykernel` stay at the bundled versions so `cb` keeps working; installing a conflicting version is refused with an explanation.
 - A package installed from Settings → Packages is importable in an already running notebook only after restarting its kernel (`%pip install` inside a notebook works immediately for new packages).
-- Features are hand-tested on Windows; the tray, start-with-Windows and some dashboard editing paths have had less testing than the rest. Please report problems at <https://github.com/chaker88/ChakyBricks/issues>.
+
+## Feedback
+
+Please report problems or suggestions at <https://github.com/chaker88/ChakyBricks/issues>.
 
 ## License
 
