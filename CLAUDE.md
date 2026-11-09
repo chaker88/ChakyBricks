@@ -8,7 +8,9 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 **Project website** (live at https://chakybricks.pages.dev/, hosted on Cloudflare Pages): MkDocs Material site in `website/` (pages in `website/content`, config `website/mkdocs.yml`, build/preview/release steps in `website/README.md`), deployed by Cloudflare Pages from this repo (settings in `website/README.md`: root `website`, build `pip install -r requirements.txt && mkdocs build --strict`, output `site`, `PYTHON_VERSION=3.12`). `.github/workflows/website.yml` is an optional manual GitHub Pages alternative. Docs pages are written from the app's actual behaviour — update them when features change. The About dialog has a Website button (ships with the next release).
 
-**Next work (not started):** (1) v1.1 fixes from real-world use — collect them in `docs/v1.1-backlog.md`; (2) Linux support later, via a branch on a Linux machine, following the cross-platform rule in Conventions. Don't start either until the user asks.
+**Launch (2026-11-09):** v1.0.0 has been announced with a YouTube demo video (https://www.youtube.com/watch?v=jnGkZhBAZR0) and a LinkedIn post. Website: https://chakybricks.pages.dev (Cloudflare Pages). The video is shown in the root README but intentionally **not** on the website.
+
+**Next work (not started):** (1) collect feedback in `docs/v1.1-backlog.md`; (2) fix the GitHub billing issue and verify the release workflow (`workflow_dispatch`, build only); (3) then v1.1; (4) Linux support later, via a branch on a Linux machine, following the cross-platform rule in Conventions. Don't start any of these until the user asks.
 
 ### Done and approved
 
