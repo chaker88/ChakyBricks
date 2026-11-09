@@ -20,7 +20,7 @@ ChakyBricks is an offline desktop lakehouse for Windows. Import data files of up
 
 ## Install
 
-1. Download `ChakyBricks_1.0.0_x64-setup.exe` from the release assets and run it.
+1. Download `ChakyBricks_1.0.0_x64-setup.exe` (also attached as `ChakyBricks_x64-setup.exe`) from the release assets and run it.
 2. The installer is not code-signed yet, so Windows may show **"Windows protected your PC"** (SmartScreen). Choose **More info**, then **Run anyway**.
 3. Start **ChakyBricks** from the Start menu.
 

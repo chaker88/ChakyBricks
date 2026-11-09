@@ -4,7 +4,7 @@ An offline desktop lakehouse for Windows. Import data (up to ~10 GB), explore it
 
 ![Home](docs/screenshots/home.png)
 
-Website and documentation: **<https://chaker88.github.io/ChakyBricks/>**
+Website and documentation: **<https://chakybricks.pages.dev/>**
 
 ## What you get
 
@@ -22,7 +22,7 @@ Website and documentation: **<https://chaker88.github.io/ChakyBricks/>**
 
 ## Install
 
-1. Download `ChakyBricks_<version>_x64-setup.exe` from the [latest release](https://github.com/chaker88/ChakyBricks/releases/latest).
+1. [Download the installer](https://github.com/chaker88/ChakyBricks/releases/latest/download/ChakyBricks_x64-setup.exe), or pick a version from the [releases page](https://github.com/chaker88/ChakyBricks/releases).
 2. Run it. The installer is not code-signed yet, so Windows SmartScreen may ask for confirmation: choose **More info → Run anyway**.
 3. Start **ChakyBricks** from the Start menu.
 

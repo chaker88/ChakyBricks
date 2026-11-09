@@ -4,7 +4,7 @@ This page takes you from the installer to your first query, notebook and dashboa
 
 ## Install
 
-1. Download `ChakyBricks_1.0.0_x64-setup.exe` from the [latest release](https://github.com/chaker88/ChakyBricks/releases/latest) and run it.
+1. [Download the installer](https://github.com/chaker88/ChakyBricks/releases/latest/download/ChakyBricks_x64-setup.exe) (`ChakyBricks_x64-setup.exe`) and run it. Older versions and release notes are under [all releases](https://github.com/chaker88/ChakyBricks/releases).
 2. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. The installer is not code-signed yet.
 3. Start **ChakyBricks** from the Start menu.
 

@@ -12,7 +12,7 @@ describe("AboutDialog", () => {
     expect(screen.getByRole("button", { name: /Website/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /LinkedIn/ })).toBeInTheDocument();
-    expect(APP_LINKS.website).toBe("https://chaker88.github.io/ChakyBricks/");
+    expect(APP_LINKS.website).toBe("https://chakybricks.pages.dev/");
     expect(APP_LINKS.github).toBe("https://github.com/chaker88");
     expect(APP_LINKS.linkedin).toBe("https://linkedin.com/in/chaker-saidi");
   });

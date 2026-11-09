@@ -67,8 +67,11 @@ jobs:
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
           New-Item -ItemType Directory -Force dist-release | Out-Null
           Copy-Item $installer.FullName dist-release\
+          Copy-Item $installer.FullName dist-release\ChakyBricks_x64-setup.exe
           $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLower()
           "$hash  $($installer.Name)" | Out-File -FilePath "dist-release\$($installer.Name).sha256" -Encoding ascii
+          $stable = (Get-FileHash dist-release\ChakyBricks_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
+          "$stable  ChakyBricks_x64-setup.exe" | Out-File -FilePath "dist-release\ChakyBricks_x64-setup.exe.sha256" -Encoding ascii
           "INSTALLER_NAME=$($installer.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "INSTALLER_SHA=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -88,7 +91,7 @@ jobs:
 
           ### Install
 
-          1. Download **$env:INSTALLER_NAME** below and run it. Windows SmartScreen may warn that the installer is unsigned: choose *More info → Run anyway*.
+          1. Download **$env:INSTALLER_NAME** below and run it (the same file is also attached as **ChakyBricks_x64-setup.exe**, a stable name that always points to the latest release). Windows SmartScreen may warn that the installer is unsigned: choose *More info → Run anyway*.
           2. Start ChakyBricks from the Start menu. The first notebook in a workspace takes a few seconds longer while its Python environment is created.
 
           SHA-256: ``$env:INSTALLER_SHA``

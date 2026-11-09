@@ -6,7 +6,7 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 **v1.0.0 was released manually on 2026-11-08** (GitHub release "ChakyBricks 1.0.0", tag `v1.0.0`, installer attached, marked Latest). Phase 7 is complete; Part A of its hand test passed on the installed build. The GitHub Actions release workflow (`.github/workflows/release.yml`) has **never run** because of a billing issue on the user's GitHub account — once that is fixed, run it manually (`workflow_dispatch`, build only) to verify it before the next release. Release notes: `docs/release-notes-1.0.0.md`.
 
-**Project website** (added 2026-11-09, not yet deployed): MkDocs Material site in `website/` (pages in `website/content`, config `website/mkdocs.yml`, build/preview/release steps in `website/README.md`), deployed by `.github/workflows/website.yml` to GitHub Pages at https://chaker88.github.io/ChakyBricks/ once Pages is enabled in the repo settings (Settings → Pages → Source: GitHub Actions) and Actions works. Docs pages are written from the app's actual behaviour — update them when features change. The About dialog has a Website button (ships with the next release).
+**Project website** (live at https://chakybricks.pages.dev/, hosted on Cloudflare Pages): MkDocs Material site in `website/` (pages in `website/content`, config `website/mkdocs.yml`, build/preview/release steps in `website/README.md`), deployed by Cloudflare Pages from this repo (settings in `website/README.md`: root `website`, build `pip install -r requirements.txt && mkdocs build --strict`, output `site`, `PYTHON_VERSION=3.12`). `.github/workflows/website.yml` is an optional manual GitHub Pages alternative. Docs pages are written from the app's actual behaviour — update them when features change. The About dialog has a Website button (ships with the next release).
 
 **Next work (not started):** (1) v1.1 fixes from real-world use — collect them in `docs/v1.1-backlog.md`; (2) Linux support later, via a branch on a Linux machine, following the cross-platform rule in Conventions. Don't start either until the user asks.
 
@@ -160,6 +160,10 @@ Python is always `py -3.12` (system) or `backend\.venv\Scripts\python.exe` (proj
 - First kernel start in a workspace creates the venv (~5–10 s with pip); later starts ~2–3 s.
 - Release: `.github/workflows/release.yml` (tag `v*`, or manual run = build only) runs setup + `scripts\check.ps1` + `npm run build:app` on windows-latest, checks the tag equals the `package.json` version, uploads the installer + SHA-256 and creates the GitHub Release with notes. `backend/constraints.txt` (pip freeze of the dev venv, no editable) pins the dev environment — and therefore the bundled runtime — in CI; refresh it when you upgrade backend deps. Version lives in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`/`Cargo.lock`, `backend/pyproject.toml`, `backend/chakybricks/__init__.py`.
 - Not done (optional, later): size reductions (polars/deltalake/pyarrow/scipy are ~65% of the runtime), code signing.
+
+## Releasing
+
+Every release attaches **two copies of the installer**: the versioned `ChakyBricks_<version>_x64-setup.exe` and the same file as **`ChakyBricks_x64-setup.exe`** (stable name — the website's "Download for Windows" button links to `https://github.com/chaker88/ChakyBricks/releases/latest/download/ChakyBricks_x64-setup.exe`, so the stable asset must exist on every release). `.github/workflows/release.yml` does this automatically (it also adds `.sha256` files). Manual release (while Actions is unavailable): build with `npm run build:app`, copy the installer to `ChakyBricks_x64-setup.exe`, then `gh release create v<version> <versioned.exe> ChakyBricks_x64-setup.exe --title "ChakyBricks <version>" --notes-file docs/release-notes-<version>.md`. Afterwards update the website (`website/README.md`, "Updating for a release").
 
 ## Commits
 

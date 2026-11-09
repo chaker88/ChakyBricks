@@ -1,6 +1,6 @@
 # ChakyBricks website
 
-The project site at <https://chaker88.github.io/ChakyBricks/>, built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). Everything for the site lives in this folder (the repository's `docs/` folder is separate).
+The project site at <https://chakybricks.pages.dev/>, built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). Everything for the site lives in this folder (the repository's `docs/` folder is separate).
 
 ```
 website/
@@ -54,13 +54,14 @@ Notes:
 - Cloudflare rebuilds on every push to `main`; use **Settings → Builds → Build watch paths** (include `website/*`) if you only want rebuilds when the site changes. Pushes to other branches get preview deployments.
 - A custom domain can be added under the project's **Custom domains** tab.
 
-`.github/workflows/website.yml` is an optional GitHub Pages alternative (manual run only); it is not needed when using Cloudflare.
+`.github/workflows/website.yml` is an optional GitHub Pages alternative (manual run only); it is not needed when using Cloudflare. If you use it, update `SITE_URL` and the site links accordingly.
 
 ## Updating for a release
 
 1. Add `docs/release-notes-<version>.md`, then run `website\.venv\Scripts\python website\tools\sync_changelog.py` (add the release date to `DATES` in that script) to regenerate `content/changelog.md`.
 2. Update the version and installer size on the home page (`content/index.md`) and in `content/docs/getting-started.md`.
-3. If features changed, update the matching page under `content/docs/`.
-4. Run `mkdocs build --strict` and commit.
+3. The home page's download button uses the stable link `releases/latest/download/ChakyBricks_x64-setup.exe`, so it needs no change as long as each release attaches the installer under that name (see CLAUDE.md, "Releasing").
+4. If features changed, update the matching page under `content/docs/`.
+5. Run `mkdocs build --strict` and commit.
 
 To regenerate the logo variants after changing `assets/logo.png`: `website\.venv\Scripts\python website\tools\make_logos.py` (needs `pillow` and `numpy`).

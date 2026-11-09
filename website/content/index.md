@@ -15,9 +15,9 @@ hide:
 
 ChakyBricks is an offline desktop lakehouse for Windows. Import data files of up to about 10 GB, explore them with **SQL**, work with them in **Python notebooks**, build **dashboards** and **schedule jobs** — all on your own machine, with no server, no account and no internet connection needed.
 
-[:fontawesome-brands-windows: Download for Windows](https://github.com/chaker88/ChakyBricks/releases/latest){ .md-button .md-button--primary .cb-download }
+[:fontawesome-brands-windows: Download for Windows](https://github.com/chaker88/ChakyBricks/releases/latest/download/ChakyBricks_x64-setup.exe){ .md-button .md-button--primary .cb-download }
 
-<p class="cb-meta">Version 1.0.0 · installer about 194 MB · Windows 10/11 (64-bit) · free and open source (Apache-2.0)</p>
+<p class="cb-meta">Version 1.0.0 · installer about 194 MB · Windows 10/11 (64-bit) · free and open source (Apache-2.0) · <a href="https://github.com/chaker88/ChakyBricks/releases">All releases</a></p>
 
 </div>
 
@@ -116,6 +116,6 @@ No out-of-memory errors; queries that do not fit in memory spill to disk, with a
 
 ## Install in three steps
 
-1. [Download the installer](https://github.com/chaker88/ChakyBricks/releases/latest) (`ChakyBricks_1.0.0_x64-setup.exe`) and run it.
+1. [Download the installer](https://github.com/chaker88/ChakyBricks/releases/latest/download/ChakyBricks_x64-setup.exe) and run it ([all releases](https://github.com/chaker88/ChakyBricks/releases)).
 2. If Windows shows **"Windows protected your PC"**, click **More info → Run anyway**.
 3. Start **ChakyBricks** from the Start menu and follow [Getting started](docs/getting-started.md).
