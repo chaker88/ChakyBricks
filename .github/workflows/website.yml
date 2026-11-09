@@ -1,11 +1,7 @@
 name: Website
 
+# Optional alternative to Cloudflare Pages (the site is normally deployed there). Manual run only.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "website/**"
-      - ".github/workflows/website.yml"
   workflow_dispatch:
 
 permissions:

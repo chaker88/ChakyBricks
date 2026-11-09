@@ -1,7 +1,8 @@
 site_name: ChakyBricks
 site_description: An offline desktop lakehouse for Windows. Build · Analyze · Innovate Locally.
 site_author: Chaker Saidi
-site_url: https://chaker88.github.io/ChakyBricks/
+# Set the SITE_URL environment variable to the deployed address (canonical links, sitemap).
+site_url: !ENV [SITE_URL, ""]
 repo_url: https://github.com/chaker88/ChakyBricks
 repo_name: chaker88/ChakyBricks
 copyright: Copyright &copy; 2026 Chaker Saidi · Apache License 2.0
