@@ -6,6 +6,8 @@ Single-user offline desktop lakehouse for Windows. **SPEC.md is the source of tr
 
 **v1.0.0 was released manually on 2026-11-08** (GitHub release "ChakyBricks 1.0.0", tag `v1.0.0`, installer attached, marked Latest). Phase 7 is complete; Part A of its hand test passed on the installed build. The GitHub Actions release workflow (`.github/workflows/release.yml`) has **never run** because of a billing issue on the user's GitHub account — once that is fixed, run it manually (`workflow_dispatch`, build only) to verify it before the next release. Release notes: `docs/release-notes-1.0.0.md`.
 
+**Project website** (added 2026-11-09, not yet deployed): MkDocs Material site in `website/` (pages in `website/content`, config `website/mkdocs.yml`, build/preview/release steps in `website/README.md`), deployed by `.github/workflows/website.yml` to GitHub Pages at https://chaker88.github.io/ChakyBricks/ once Pages is enabled in the repo settings (Settings → Pages → Source: GitHub Actions) and Actions works. Docs pages are written from the app's actual behaviour — update them when features change. The About dialog has a Website button (ships with the next release).
+
 **Next work (not started):** (1) v1.1 fixes from real-world use — collect them in `docs/v1.1-backlog.md`; (2) Linux support later, via a branch on a Linux machine, following the cross-platform rule in Conventions. Don't start either until the user asks.
 
 ### Done and approved

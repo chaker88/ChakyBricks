@@ -1,0 +1,91 @@
+site_name: ChakyBricks
+site_description: An offline desktop lakehouse for Windows. Build · Analyze · Innovate Locally.
+site_author: Chaker Saidi
+site_url: https://chaker88.github.io/ChakyBricks/
+repo_url: https://github.com/chaker88/ChakyBricks
+repo_name: chaker88/ChakyBricks
+copyright: Copyright &copy; 2026 Chaker Saidi · Apache License 2.0
+docs_dir: content
+strict: true
+
+theme:
+  name: material
+  logo: assets/icon.png
+  favicon: assets/favicon.ico
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys:
+      key_map:
+        ctrl: Ctrl
+        alt: Alt
+        shift: Shift
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/chaker88
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/in/chaker-saidi
+
+nav:
+  - Home: index.md
+  - Documentation:
+      - Getting started: docs/getting-started.md
+      - Importing data: docs/importing-data.md
+      - SQL editor: docs/sql-editor.md
+      - Python notebooks: docs/notebooks.md
+      - Dashboards: docs/dashboards.md
+      - Jobs and background mode: docs/jobs.md
+      - Settings and Python packages: docs/settings.md
+      - Keyboard shortcuts: docs/shortcuts.md
+      - Troubleshooting and FAQ: docs/troubleshooting.md
+      - Known limitations: docs/limitations.md
+  - Changelog: changelog.md
+  - About: about.md
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn

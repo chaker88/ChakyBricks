@@ -3,6 +3,7 @@ export const APP_VERSION = __APP_VERSION__;
 export const APP_AUTHOR = "Chaker Saidi";
 export const APP_LICENSE = "Apache License 2.0";
 export const APP_LINKS = {
+  website: "https://chaker88.github.io/ChakyBricks/",
   github: "https://github.com/chaker88",
   linkedin: "https://linkedin.com/in/chaker-saidi",
 };

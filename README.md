@@ -4,6 +4,8 @@ An offline desktop lakehouse for Windows. Import data (up to ~10 GB), explore it
 
 ![Home](docs/screenshots/home.png)
 
+Website and documentation: **<https://chaker88.github.io/ChakyBricks/>**
+
 ## What you get
 
 - **Catalog** — import CSV, Parquet, JSON and Excel files into Delta tables with a streaming wizard (type overrides, partitioning, live preview). Arabic and other non-Latin column names work.

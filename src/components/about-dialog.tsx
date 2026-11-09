@@ -30,7 +30,15 @@ export function AboutDialog({
           <p>
             Created by <span className="font-medium">{APP_AUTHOR}</span>
           </p>
-          <div className="flex justify-center gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void openExternal(APP_LINKS.website)}
+            >
+              Website
+              <ExternalLink className="opacity-60" />
+            </Button>
             <Button variant="outline" size="sm" onClick={() => void openExternal(APP_LINKS.github)}>
               GitHub
               <ExternalLink className="opacity-60" />
